@@ -32,6 +32,8 @@ _last_deadline_miss_severity = 0
 _last_alert_ts: float = 0.0
 _alert_cooldown_sec: float = 30.0
 _prom_textfile: Optional[str] = None
+_prom_instance_id: Optional[str] = None
+_prom_enable_labels: bool = False
 _hash_mismatch_buffer = []  # store last N entries
 _hash_mismatch_buffer_max = 100
 HASH_MISMATCH_LOG = os.path.join(LOG_DIR, 'hash_mismatch_events.jsonl')
@@ -176,20 +178,38 @@ def _flush_metrics():
     if snapshot and _prom_textfile:
         try:
             lines = []
+            labels_base = {}
+            if _prom_enable_labels:
+                if _prom_instance_id:
+                    labels_base['instance_id'] = _prom_instance_id
+                # Use current loaded policy kind if any
+                if _policy.get('kind'):
+                    labels_base['policy_kind'] = _policy.get('kind')
+            def fmt(metric: str, value):
+                if not _prom_enable_labels or not labels_base:
+                    return f"{metric} {value}"
+                # label serialization in stable order
+                parts = [f"{k}='{labels_base[k]}'" for k in sorted(labels_base.keys())]
+                return f"{metric}{{{','.join(parts)}}} {value}"
             pl = snapshot.get('policy_latency_ms', {})
             for k in ('count','mean','std','min','max','p50','p90','p95','p99'):
                 v = pl.get(k)
                 if v is not None:
-                    lines.append(f"gateway_policy_latency_ms_{k} {v}")
+                    lines.append(fmt(f"gateway_policy_latency_ms_{k}", v))
             rec = snapshot.get('recent_latency_ms', {})
             for k in ('window','p50','p90','p95','p99'):
                 v = rec.get(k)
                 if v is not None:
-                    lines.append(f"gateway_recent_latency_ms_{k} {v}")
+                    lines.append(fmt(f"gateway_recent_latency_ms_{k}", v))
             cnt = snapshot.get('counters', {})
             for k,v in cnt.items():
                 if v is not None:
-                    lines.append(f"gateway_{k} {v}")
+                    lines.append(fmt(f"gateway_{k}", v))
+            # severity snapshot if present
+            sev = snapshot.get('severity', {})
+            for k,v in sev.items():
+                if v is not None:
+                    lines.append(fmt(f"gateway_severity_{k}", v))
             tmp = _prom_textfile + '.tmp'
             with open(tmp, 'w', encoding='utf-8') as f:
                 f.write('\n'.join(lines) + '\n')
@@ -610,6 +630,8 @@ def main():
     parser.add_argument("--alert-deadline-miss-rate-warn", type=float, default=None, help="WARN threshold for deadline_miss_rate (0-1); overrides legacy single threshold for WARN if set")
     parser.add_argument("--alert-deadline-miss-rate-crit", type=float, default=None, help="CRIT threshold for deadline_miss_rate (0-1)")
     parser.add_argument("--prometheus-textfile", type=str, default=None, help="Write Prometheus textfile metrics to this path on each flush")
+    parser.add_argument("--prometheus-instance-id", type=str, default=None, help="Instance identifier label value when label export enabled")
+    parser.add_argument("--prometheus-enable-labels", action='store_true', help="Enable labeled Prometheus metrics (instance_id, policy_kind)")
     args = parser.parse_args()
     host = args.host
     port = args.port
@@ -628,8 +650,10 @@ def main():
     _alert_latency_p95_ms_crit = args.alert_latency_p95_ms_crit
     _alert_deadline_miss_rate_warn = args.alert_deadline_miss_rate_warn
     _alert_deadline_miss_rate_crit = args.alert_deadline_miss_rate_crit
-    global _prom_textfile
+    global _prom_textfile, _prom_instance_id, _prom_enable_labels
     _prom_textfile = args.prometheus_textfile
+    _prom_instance_id = args.prometheus_instance_id
+    _prom_enable_labels = bool(args.prometheus_enable_labels)
     _load_schema_validator()
     if args.policy:
         ok, detail = _load_policy_file(args.policy)
