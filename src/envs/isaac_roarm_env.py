@@ -4,7 +4,7 @@
 조건부 import 및 graceful degrade 패턴을 사용.
 """
 from __future__ import annotations
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, Optional
 import numpy as np
 
 from .base_env import BaseSim2RealEnv
@@ -23,20 +23,22 @@ class IsaacRoArmM3Env(BaseSim2RealEnv):
     # Observation: [q(6), dq(6), goal_delta(6)] = 18 dims (placeholder design)
     OBS_DIM = 18
 
-    def __init__(self, stage_path: str, joint_config: Dict[str, Any], domain_randomizer=None, headless: bool = False, articulation_prim: str | None = None):
+    def __init__(self, stage_path: str, joint_config: Dict[str, Any], domain_randomizer=None, headless: bool = False, articulation_prim: str | None = None, robot_usd_path: Optional[str] = None, warmup_steps: int = 3, attach_retries: int = 3):
         if not ISAAC_AVAILABLE:
             raise RuntimeError("Isaac Sim Python API를 사용할 수 없는 환경입니다. setup_python_env.sh 실행을 확인하세요.")
         super().__init__(domain_randomizer)
         self._stage_path = stage_path
         self._joint_config = joint_config
         self._world = World(stage_units_in_meters=1.0)
-        # TODO: Stage 로드, 로봇 instancing, articulation 핸들 확보 후 JointAPI 주입
         self._joint_api = JointAPI(articulation=None)
         self._articulation_prim = articulation_prim or "/World/roarm"
+        self._robot_usd_path = robot_usd_path
+        self._warmup_steps = warmup_steps
+        self._attach_retries = max(1, attach_retries)
+        self.headless = headless
         self._q = np.zeros(self.ACTION_DIM)
         self._dq = np.zeros(self.ACTION_DIM)
         self._goal = np.zeros(self.ACTION_DIM)
-        # Joint limits (loaded lazily once to avoid file IO in tight loop)
         self._limits_loaded = False
         self._limit_lower = np.full(self.ACTION_DIM, -1.0, dtype=float)
         self._limit_upper = np.full(self.ACTION_DIM, 1.0, dtype=float)
@@ -47,12 +49,21 @@ class IsaacRoArmM3Env(BaseSim2RealEnv):
         if self._stage_loaded or not ISAAC_AVAILABLE:
             return
         try:
-            # World API가 stage USD를 명시적으로 로드하는 헬퍼가 있는 버전/구성도 존재
-            # 여기서는 최소한 stage path 존재 플래그만 기록 (실제 로드 로직은 후속 구현)
-            # 예: self._world.scene.add(reference prim) 형태 (버전 차이로 주석)
+            # Stage file 자체를 World가 로드해야 하는 경우 (버전별 차이 존재) - stage_path는 월드 초기화 참고용
+            # 로봇 USD 참조 추가
+            if self._robot_usd_path:
+                try:
+                    from omni.isaac.core.utils.stage import add_reference_to_stage  # type: ignore
+                    add_reference_to_stage(self._robot_usd_path, self._articulation_prim)
+                except Exception:  # noqa
+                    pass
+            # World reset을 통해 scene graph 반영
+            try:
+                self._world.reset()
+            except Exception:  # noqa
+                pass
             self._stage_loaded = True
         except Exception:  # noqa
-            # 실패 시에도 placeholder로 진행
             self._stage_loaded = False
 
     def reset(self, *, seed: int | None = None, options: Dict[str, Any] | None = None):
@@ -77,11 +88,20 @@ class IsaacRoArmM3Env(BaseSim2RealEnv):
         # TODO: Stage 로드 및 로봇 초기화 + articulation 핸들 재획득
         # placeholder: articulation prim path attach (실제 handle 획득 전)
         if not self._joint_api.is_attached():
-            # World 전달하여 articulation view 생성 시도 (Isaac 가능 시)
-            self._joint_api.attach(self._articulation_prim, world=self._world, tries=1)
+            self._joint_api.attach(self._articulation_prim, world=self._world, tries=self._attach_retries)
+        # Warm-up simulation & re-attach if needed (articulation might appear after a few steps)
+        if hasattr(self._joint_api, '_articulation') and self._joint_api._articulation is None:
+            for _ in range(max(0, self._warmup_steps)):
+                try:
+                    self._world.step(render=not getattr(self, 'headless', False))
+                except Exception:  # noqa
+                    break
+            if self._joint_api._articulation is None:
+                # one more attach attempt after warm-up
+                self._joint_api.attach(self._articulation_prim, world=self._world, tries=1)
         self.apply_domain_randomization()
         obs = self._get_obs()
-        info = {"stage": self._stage_path}
+        info = {"stage": self._stage_path, "articulation_attached": bool(getattr(self._joint_api, '_articulation', None))}
         if hasattr(self, "_last_physics_report"):
             info["physics_report"] = getattr(self, "_last_physics_report")
         self._step_count = 0
