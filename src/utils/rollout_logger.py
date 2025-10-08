@@ -77,9 +77,12 @@ class RolloutLogger:
                 self._info_store.setdefault(k, []).append(float(v))
         self._obs.append(obs.copy())
 
-    def end_episode(self):
+    def end_episode(self, env_id: int | None = None):
         ep_idx = self.episodes + 1
-        ep_name = f"ep_{ep_idx:05d}.npz"
+        if env_id is None:
+            ep_name = f"ep_{ep_idx:05d}.npz"
+        else:
+            ep_name = f"ep_{ep_idx:05d}_env{env_id}.npz"
         arr_info = {k: np.array(v, dtype=float) for k, v in self._info_store.items()}
         np.savez_compressed(
             os.path.join(self.dir, ep_name),
