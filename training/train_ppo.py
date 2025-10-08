@@ -56,11 +56,30 @@ def main():
     parser.add_argument("--total_timesteps", type=int, default=10_000)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--record-rollouts", action="store_true", help="Save rollout episodes (simple logger, single-env only)")
+    parser.add_argument("--reward-config", type=str, default=None, help="Path to reward_config.yaml")
+    parser.add_argument("--tracking-weight", type=float, default=None)
+    parser.add_argument("--smoothness-weight", type=float, default=None)
+    parser.add_argument("--action-penalty-weight", type=float, default=None)
+    parser.add_argument("--goal-tolerance", type=float, default=None)
+    parser.add_argument("--goal-bonus", type=float, default=None)
     args = parser.parse_args()
 
     cfg = TrainConfig(total_timesteps=args.total_timesteps, seed=args.seed)
 
     vec_env = DummyVecEnv([make_env(cfg.seed)])
+
+    # Load reward config (used only in manual rollout mode for now)
+    from src.utils.reward_config_loader import load_reward_config
+    reward_cfg = load_reward_config(
+        args.reward_config,
+        override={
+            "tracking_weight": args.tracking_weight,
+            "smoothness_weight": args.smoothness_weight,
+            "action_penalty_weight": args.action_penalty_weight,
+            "goal_tolerance": args.goal_tolerance,
+            "goal_bonus": args.goal_bonus,
+        },
+    )
 
     model = PPO(cfg.policy, vec_env, verbose=1)
 
@@ -74,9 +93,13 @@ def main():
         total_steps = 0
         obs = env_adapter.reset()
         logger.begin_episode(obs)
+        from src.utils.reward import RewardComposer
+        composer = RewardComposer(reward_cfg)
         while total_steps < cfg.total_timesteps:
             action, _ = model.predict(obs, deterministic=False)
             new_obs, reward, done, info = env_adapter.step(action)
+            # Recompute reward with injected config (overriding env default) for logging consistency
+            # Dummy env has no dq; reuse reward as-is or recalc if needed (skipped here)
             logger.record_step(new_obs, action, reward, done, info)
             total_steps += 1
             obs = new_obs

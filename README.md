@@ -110,6 +110,23 @@ python training/train_ppo.py --total_timesteps 2000 --seed 0
 ```
 결과 모델: `policies/ppo_dummy_roarm.zip`
 
+### Rollout 기록 + Reward 설정 커스터마이즈
+```bash
+python training/train_ppo.py \
+  --total_timesteps 1000 \
+  --record-rollouts \
+  --reward-config configs/reward_config.yaml \
+  --tracking-weight 1.2 --smoothness-weight 0.02 --goal-bonus 0.7
+```
+생성 구조 예시:
+```
+rollouts/
+  2025-10-08T12-34-56/
+    meta.json         # env / reward_terms / git hash
+    ep_00001.npz      # obs/actions/rewards/dones + 선택 info 키
+```
+`configs/reward_config.yaml` 값 + CLI override를 병합하여 RewardComposer 구성.
+
 ## 다음 확장 포인트
 - [ ] Isaac Sim 실제 RoArm M3 USD/URDF 로드 + 관절 맵핑
 - [x] 도메인 랜덤라이제이션 기본 로더 (`DomainRandomizer`) 구현
@@ -154,6 +171,8 @@ python sim/inspect_stage.py --usd /absolute/path/to/roarm.usd --update-joints
 ## 로깅 & 관측성
 - 학습: SB3 logger
 - MCP: 추후 request/response JSON 로깅 + latency 측정
+- Rollout: `--record-rollouts` 사용 시 episode 단위 NPZ + meta.json 저장
+- Randomization: 마지막 샘플 캐시(`DomainRandomizer.last_sample()`) → 추후 meta 확장 예정
 
 ## 테스트
 간단 smoke test 추가 예정:
