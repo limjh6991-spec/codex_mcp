@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug PPO Training",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "training/train_ppo.py",
+            "args": [
+                "--total_timesteps",
+                "1000",
+                "--seed",
+                "0"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug Isaac MCP Server",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "mcp_servers/isaac_controller_server.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONUNBUFFERED": "1"
+            }
+        }
+    ]
+}

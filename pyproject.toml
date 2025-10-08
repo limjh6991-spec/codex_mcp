@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codex-mcp-rl"
+version = "0.1.0"
+description = "Codex + MCP 통합 VSCode 환경 기반 로봇팔 (roarm m3) Isaac Sim 강화학습"
+authors = [ { name = "roarm" } ]
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+
+# 코어 학습/시뮬레이션 의존성 (최소 셋)
+dependencies = [
+  "torch>=2.3.0",
+  "numpy",
+  "gymnasium>=0.29.0",
+  "stable-baselines3>=2.3.0",
+  "tyro",  # CLI config
+  "omegaconf",
+  "pydantic>=2.6.0",
+  "pyyaml",
+  "rich",
+  "tqdm",
+  "fastapi",
+  "uvicorn",
+  "websockets",
+  "msgpack",
+  "orjson",
+  "pytest",
+]
+
+[project.optional-dependencies]
+# Isaac Sim Python 패키지는 별도 (NVIDIA 배포) - 런타임시 PYTHONPATH 추가
+sim = [
+  "pyquaternion",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 100
+
+[tool.isort]
+profile = "black"
+
+[tool.ruff]
+line-length = 100

@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.env
+.venv/
+venv/
+
+# Logs
+logs/
+*.log
+
+# RL artifacts
+policies/*.zip
+checkpoints/
+
+# IDE
+.vscode/*.code-workspace
+.idea/
+
+# Cache
+*.egg-info/
+.dist/
+.build/
+.mypy_cache/
+.pytest_cache/
+
+# Data
+outputs/
+artifacts/
+
+# Misc
+.DS_Store

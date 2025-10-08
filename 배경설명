@@ -1,0 +1,47 @@
+1. 작업 목표
+ 1-1 “codex + MCP 통합 VS Code 환경”구축
+     왜 codex + MCP 통합인가?
+       1-1-1 단일 창 오케스트레이션
+VS Code의 Copilot(Chat) = 에이전트. 여러 MCP 서버(프롬프트 생성, 이미지 생성, Blender, ROS/Isaac Sim, GitHub 등)를 하나의 대화로 연결해서 순차/병렬 호출.
+       1-1-2모듈형 아키텍처
+각 기능을 독립 MCP 서버로 분리 → 교체/확장 용이(예: Stable Diffusion ↔ Midjourney 백엔드 스왑).
+       1-1-3재현성과 자동화
+설정 파일(mcp.json/settings.json) 기반 → 팀/PC 간 동일 환경 재사용. 워크플로우 재현 쉬움.
+       1-1-4 안전한 비밀/키 관리
+환경변수(.env) 분리 + 서버별 최소 권한. 워크스페이스 외부로 API 키 노출 최소화.
+       1-1-5 디버깅/관측성 향상
+MCP Inspector로 요청/응답, 표준입출력 로그, 처리 지연 병목을 눈으로 확인.
+       1-1-6로컬-클라우드 하이브리드
+로컬 Blender/Isaac Sim/ROS2와 클라우드 LLM/이미지 백엔드를 같은 파이프라인에서 호출.
+       1-1-7로보틱스 실무 적합성
+Isaac Sim(USD/Articulation) → RL → 데이터 버전 관리(GitHubMcp)까지 엔드투엔드 자동화.
+
+2. 중간(오늘의) 목표 : roarm m3 로봇팔을  Isaac Sim(gui)에서 강화 학습 가능한 환경 구축
+    (
+    참조 사이트 : roarm m3 - https://github.com/orgs/waveshareteam/repositories
+                         isaac-sim -  https://github.com/isaac-sim\   
+    )
+
+2. 작업 환경
+✅ 양호한 부분
+CPU: AMD Ryzen 7 9800X3D (16 코어) - 매우 강력한 성능
+메모리: 30GB RAM (24GB 사용 가능) - 충분한 용량
+GPU: NVIDIA GeForce RTX 5090 (32GB VRAM) - 최고 사양의 GPU
+OS: Ubuntu 24.04.3 LTS (최신 안정 버전)
+Python: 3.12.3 (최신 버전)
+VS Code: 1.104.3 + 필수 확장 프로그램 설치됨
+Git: 설치됨
+
+3. 작업전 필수 체크 필요
+3-1. 현재 설치된 Isaac Sim(gui)
+    설치파일 :isaac-sim-standalone-5.0.0-linux-x86_64.zip
+    버젼확인 필요
+    버젼 확인 후 정확한 가이드 요망
+
+3-2. Isaac Sim 관련 sdk 설치 여부 확인
+    sdk가 설치 됐다면 현재 설치된 설치파일 Isaac Sim(gui:isaac-sim-standalone-5.0.0-linux-x86_64.zip)
+    호환성 확인 
+
+   참고 :  그동안 vscode copilot의 claude4를 이용 로봇팔(roarm m3 및 isaacsim 내장(?) 로봇팔을 
+              Isaac Sim(gui)에서 확인 하는 작업을 진행하는 동안 로봇팔을 완전한게
+              Isaac Sim(gui)에서 표현하지 못함

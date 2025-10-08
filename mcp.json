@@ -1,0 +1,16 @@
+{
+    "version": 1,
+    "servers": [
+        {
+            "name": "isaac",
+            "command": "python",
+            "args": [
+                "mcp_servers/isaac_controller_server.py"
+            ],
+            "env": {
+                "PYTHONUNBUFFERED": "1",
+                "ISAAC_SIM_PATH": "${env:ISAAC_SIM_PATH}"
+            }
+        }
+    ]
+}

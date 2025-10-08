@@ -1,0 +1,16 @@
+# RoArm M3 Joint Mapping (Placeholder)
+# 실제 USD/URDF 확인 후 joint 이름 업데이트 필요
+joints:
+  - base_rotate
+  - shoulder_lift
+  - elbow_flex
+  - wrist_pitch
+  - wrist_roll
+  - gripper
+limits:
+  base_rotate: [-3.14, 3.14]
+  shoulder_lift: [-1.57, 1.57]
+  elbow_flex: [-1.57, 1.57]
+  wrist_pitch: [-1.57, 1.57]
+  wrist_roll: [-3.14, 3.14]
+  gripper: [0.0, 0.04]

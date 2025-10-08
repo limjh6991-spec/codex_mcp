@@ -1,0 +1,29 @@
+{
+    "python.defaultInterpreterPath": ".venv/bin/python",
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.analysis.autoImportCompletions": true,
+    "editor.formatOnSave": true,
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.mypy_cache": true
+    },
+    "terminal.integrated.env.linux": {
+        "PYTHONUNBUFFERED": "1"
+    },
+    "mcp.servers": [
+        {
+            "name": "isaac",
+            "command": "python",
+            "args": [
+                "mcp_servers/isaac_controller_server.py"
+            ],
+            "env": {
+                "PYTHONUNBUFFERED": "1",
+                "ISAAC_SIM_PATH": "${env:ISAAC_SIM_PATH}"
+            }
+        }
+    ]
+}

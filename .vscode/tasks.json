@@ -1,0 +1,37 @@
+{
+    "$schema": "https://raw.githubusercontent.com/microsoft/vscode/main/extensions/configuration-editing/schemas/vscode-tasks-schema.json",
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Install deps",
+            "type": "shell",
+            "command": "pip install -e .",
+            "problemMatcher": []
+        },
+        {
+            "label": "Test",
+            "type": "shell",
+            "command": "pytest -q",
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "Train PPO (quick)",
+            "type": "shell",
+            "command": "python training/train_ppo.py --total_timesteps 2000 --seed 0",
+            "problemMatcher": []
+        },
+        {
+            "label": "Check Isaac Import",
+            "type": "shell",
+            "command": "python scripts/check_isaac_import.py",
+            "problemMatcher": []
+        },
+        {
+            "label": "Run MCP Isaac Server",
+            "type": "shell",
+            "command": "python mcp_servers/isaac_controller_server.py",
+            "problemMatcher": []
+        }
+    ]
+}
