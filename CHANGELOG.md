@@ -5,17 +5,11 @@ The format roughly follows Keep a Changelog (dates in YYYY-MM-DD) and semantic g
 
 ## [Unreleased]
 ### Added
-- Severity-tiered alerts (WARN/CRIT) for latency / deadline miss (planned)
-- Prometheus labels (instance_id, policy_kind) (planned)
-- Hash mismatch aggregate counter (planned)
-- Transport benchmarking script (planned)
-- Drift analysis tool for hash mismatch forensic log (planned)
-
+- (placeholder)
 ### Changed
-- (planned) Architecture doc to reflect advanced alerting & benchmarking
-
+- (placeholder)
 ### Removed
-- (none)
+- (placeholder)
 
 ## [2025-10-08] - Observability & SLA Expansion
 ### Added
@@ -26,10 +20,21 @@ The format roughly follows Keep a Changelog (dates in YYYY-MM-DD) and semantic g
 - CSV export option in `measure_round_trip.py`
 - Event log size-based rotation + optional gzip compression
 - deadline_miss_rate metric & counter exposure
+- Severity-tiered alerts (WARN/CRIT) for latency / deadline miss
+- Prometheus labels (instance_id, policy_kind)
+- Transport benchmarking script (`bench_transport.py`)
+- Drift analysis tool (`analyze_hash_drift.py`)
+- Hash mismatch aggregate counter Prometheus 노출
+- RoArm M3 asset scaffold (URDF placeholder, joint_spec.json, asset README)
+- Observation/Action schema 확장: `joint_names`, `action_scale_hint`
+- Gateway transport escalate advisory (`--auto-transport-escalate-p95`)
+- Performance baseline 문서 (`docs/PERF_BASELINE.md`)
+- Isaac side control loop stub (`scripts/isaac_roarm_loop_stub.py`)
 
 ### Changed
 - README updated to reflect mature gateway (no longer a stub)
 - OBSERVABILITY doc expanded with alerts, Prometheus, forensics
+- Architecture decision doc enhancement status + transport escalate 완료 표시
 
 ## [2025-10-07] - Core IPC & Safety
 ### Added

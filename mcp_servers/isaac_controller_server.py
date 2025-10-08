@@ -132,6 +132,9 @@ class IsaacControlServer:
         self._emergency_stop = False
         self._last_action = None  # last applied delta (list[float])
         self._rate_limit_per_joint = 0.2  # max absolute delta change per joint per call
+        # Joint spec cache
+        self._joint_spec = None  # loaded JSON
+        self._joint_spec_path = None
 
     @structured_tool
     def start_sim(self, headless: bool = False) -> Dict[str, Any]:
@@ -199,6 +202,51 @@ class IsaacControlServer:
         # TODO: drive target 설정 → 결과 joint state 업데이트
         self._last_joint_state = {"positions": targets, "velocities": [0.0] * len(targets)}
         return {"status": "ok", "count": len(targets)}
+
+    @structured_tool
+    def load_joint_spec(self, path: str = "assets/roarm_m3/joint_spec.json") -> Dict[str, Any]:
+        if not os.path.exists(path):
+            return {"ok": False, "error_code": "NOFILE", "error": f"joint spec not found: {path}"}
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                self._joint_spec = json.load(f)
+            self._joint_spec_path = path
+            return {"ok": True, "path": path, "assumed_dof": self._joint_spec.get('assumed_dof'), "version": self._joint_spec.get('version')}
+        except Exception as e:
+            return {"ok": False, "error_code": "PARSE", "error": str(e)}
+
+    @structured_tool
+    def get_joint_spec(self) -> Dict[str, Any]:
+        if not self._joint_spec:
+            return {"ok": False, "error_code": "UNLOADED", "error": "joint spec not loaded"}
+        # Return shallow copy without large notes array if long
+        spec = dict(self._joint_spec)
+        notes = spec.get('notes')
+        if isinstance(notes, list) and len(notes) > 5:
+            spec['notes'] = notes[:5] + ['<trunc>']
+        return {"ok": True, "spec": spec, "path": self._joint_spec_path}
+
+    @structured_tool
+    def list_joint_names(self) -> Dict[str, Any]:
+        if self._joint_spec and 'joints' in self._joint_spec:
+            names = [j.get('name') for j in self._joint_spec['joints'] if isinstance(j, dict) and 'name' in j]
+        else:
+            names = [f"joint{i}" for i in range(1, len(self._last_joint_state.get('positions', [])) + 1)] or []
+        return {"ok": True, "joint_names": names, "count": len(names)}
+
+    @structured_tool
+    def read_gateway_metrics(self, path: str = "logs/ipc_metrics.json") -> Dict[str, Any]:
+        if not os.path.exists(path):
+            return {"ok": False, "error_code": "NOFILE", "error": f"metrics file not found: {path}"}
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            latency = data.get('policy_latency_ms', {})
+            recent = data.get('recent_latency_ms', {})
+            counters = data.get('counters', {})
+            return {"ok": True, "p95": latency.get('p95'), "recent_p95": recent.get('p95'), "counters": counters}
+        except Exception as e:
+            return {"ok": False, "error_code": "PARSE", "error": str(e)}
 
     @structured_tool
     def policy_infer(self, observation: list[float] | None = None, policy_path: str | None = None, deterministic: bool = True) -> Dict[str, Any]:

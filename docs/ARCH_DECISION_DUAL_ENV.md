@@ -104,7 +104,7 @@ Accepted (2025-10-08).
 | Hash mismatch aggregate | rand_hash_mismatch 누적 counter | 완료 | forensic JSONL + drift 분석 스크립트 |
 | Transport benchmark script | TCP 지연 측정 스크립트 | 완료 | `scripts/bench_transport.py` |
 | Drift analysis tooling | mismatch forensic 로그 패턴 요약 | 완료 | `scripts/analyze_hash_drift.py` |
-| Auto transport escalate | 임계 초과 sustained 시 메시지 출력/권고 | 대기 | p95 > 60ms 조건 충족 시 구현 |
+| Auto transport escalate | 임계 초과 sustained 시 메시지 출력/권고 | 완료 | `--auto-transport-escalate-p95` advisory 이벤트 구현 |
 
 ---
 문서 개선 또는 상태 변경 시 업데이트 후 git commit 메시지: `docs: update dual env decision`.
