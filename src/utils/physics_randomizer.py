@@ -181,9 +181,50 @@ def _apply_robot_params(world: Any, cfg: Dict[str, Any], report: Dict[str, Any],
                 detail[k] = {"scale": float(v), "note": "damping_get_or_set_unavailable"}
                 report["skipped_keys"].append(k)
             elif k == "link_friction_scale" and articulation is not None:
-                # Real implementation would traverse links & materials; mark skipped for now.
-                detail[k] = {"scale": float(v), "note": "link_friction_not_implemented"}
-                report["skipped_keys"].append(k)
+                scale = float(v)
+                updated_links = 0
+                # Attempt to iterate links – heuristic method names
+                link_getters = [
+                    getattr(articulation, "get_links", None),
+                    getattr(articulation, "get_link_bodies", None),
+                ]
+                links = None
+                for g in link_getters:
+                    if callable(g):
+                        try:
+                            links = g()
+                            if links:
+                                break
+                        except Exception:  # noqa
+                            continue
+                if links is not None:
+                    for link in links:  # pragma: no cover (needs Isaac or test dummy)
+                        try:
+                            get_mat = getattr(link, "get_material", None)
+                            mat = get_mat() if callable(get_mat) else None
+                            if mat is None:
+                                continue
+                            # Fetch original friction
+                            get_sf = getattr(mat, "get_static_friction", None)
+                            get_df = getattr(mat, "get_dynamic_friction", None)
+                            sf = get_sf() if callable(get_sf) else None
+                            df = get_df() if callable(get_df) else None
+                            if sf is None or df is None:
+                                continue
+                            set_sf = getattr(mat, "set_static_friction", None)
+                            set_df = getattr(mat, "set_dynamic_friction", None)
+                            if callable(set_sf) and callable(set_df):
+                                set_sf(sf * scale)
+                                set_df(df * scale)
+                                updated_links += 1
+                        except Exception:  # noqa
+                            continue
+                if updated_links > 0:
+                    detail[k] = {"scale": scale, "links": updated_links}
+                    report["success_keys"].append(k)
+                else:
+                    detail[k] = {"scale": scale, "links": 0, "note": "no_link_materials"}
+                    report["skipped_keys"].append(k)
             else:
                 # Unknown robot-level key
                 detail[k] = v
@@ -199,12 +240,36 @@ def _apply_robot_params(world: Any, cfg: Dict[str, Any], report: Dict[str, Any],
     report["robot_applied_detail"] = detail
 
 def _apply_env_params(world: Any, cfg: Dict[str, Any], report: Dict[str, Any]):  # pragma: no cover
-    # Example future keys: ground_friction, ambient_temperature
+    # Keys: ground_friction (scale or absolute), ambient_temperature (placeholder)
     detail = {}
+    ctx = getattr(world, "get_physics_context", lambda: None)()
     for k, v in cfg.items():
         try:
-            detail[k] = v
-            report["skipped_keys"].append(k)  # placeholder until we wire actual friction application
+            if k == "ground_friction" and ctx is not None:
+                # Attempt to set global material friction if API exposed.
+                set_gf = None
+                candidates = [
+                    "set_material_static_friction",
+                    "set_static_friction",
+                ]
+                for cname in candidates:
+                    fn = getattr(ctx, cname, None)
+                    if callable(fn):
+                        set_gf = fn
+                        break
+                if callable(set_gf):
+                    try:
+                        set_gf(float(v))
+                        detail[k] = {"value": float(v)}
+                        report["success_keys"].append(k)
+                        continue
+                    except Exception:  # noqa
+                        pass
+                detail[k] = {"value": float(v), "note": "no_global_friction_api"}
+                report["skipped_keys"].append(k)
+            else:
+                detail[k] = v
+                report["skipped_keys"].append(k)
         except Exception as e:  # noqa
             emsg = _short_error(e)
             detail[k] = f"error:{emsg}"

@@ -21,3 +21,10 @@ def test_physics_randomizer_report_structure():
     assert report['applied_env'] is True
     assert 'physics_applied_detail' in report
     assert 'solver_position_iterations' in report['physics_applied_detail']
+    # Basic structural keys
+    for key in ['success_keys', 'failed_keys', 'skipped_keys', 'value_map', 'ranges']:
+        assert key in report
+    # Damping scale will likely be skipped due to no articulation in DummyWorld
+    assert 'joint_damping_scale' in report['robot_applied_detail']
+    # Ground friction attempt either success or skipped
+    assert 'ground_friction' in report['env_applied_detail']
