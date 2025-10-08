@@ -45,3 +45,92 @@ Git: 설치됨
    참고 :  그동안 vscode copilot의 claude4를 이용 로봇팔(roarm m3 및 isaacsim 내장(?) 로봇팔을 
               Isaac Sim(gui)에서 확인 하는 작업을 진행하는 동안 로봇팔을 완전한게
               Isaac Sim(gui)에서 표현하지 못함
+
+4. 작업 목표 진행 현황 (2025-10-08)
+ 4-1 상위 목표 1-1 세부 항목 진행도
+ | 코드 | 항목 | 목표 요약 | 진행 상태 | 근거/산출물 |
+ |------|------|-----------|-----------|-------------|
+ |1-1-1| 단일 창 오케스트레이션 | VS Code + MCP 통합 워크플로우 | ✅ 완료 | `.vscode/settings.json`, MCP 서버 스켈레톤, Chat 연동 테스트 |
+ |1-1-2| 모듈형 아키텍처 | 기능별 MCP 분리 구조 | ✅ 완료 | `mcp_servers/isaac_controller_server.py` + 향후 확장 포인트 문서 |
+ |1-1-3| 재현성과 자동화 | 설정 기반 반복 가능 실행 | ✅ 완료 | `pyproject.toml`, tasks, scripts, schema 파일 |
+ |1-1-4| 비밀/키 관리 | .env 분리/최소 권한 | ✅ 완료 | `.env.example`, README 가이드 |
+ |1-1-5| 관측성 향상 | 지연/이벤트 로깅 가시성 | ✅ 완료 | `ipc_policy_gateway.py` (latency, alerts, Prometheus) |
+ |1-1-6| 로컬-클라우드 하이브리드 | 로컬 시뮬+원격 모델/서비스 연동 준비 | ▶ 진행 | 구조/스크립트 준비, 클라우드 inference 아직 미구현 |
+ |1-1-7| 로보틱스 실무 적합성 | Isaac→RL→버전관리 파이프라인 | ▶ 진행 | Dual Env 확립, 정책 로딩/테스트 가능, 실제 RoArm M3 USD 미통합 |
+
+ 4-2 중간(오늘) 목표: RoArm M3 로봇팔 Isaac Sim GUI 상 강화학습 가능 환경 구축 상세 현황
+        목표 구성 요소를 세분화하여 현재 상태/차기 행동을 정의.
+        (기준: 로봇팔 모델 표현, 관절 상태 스트리밍, 행동 적용, RL 루프 연동, 관측성/성능 기준 확보)
+
+        A. 로봇 모델/자산 (USD/URDF)
+              - 현재 상태: RoArm M3 전용 USD/URDF 프로젝트 내 미포함 (placeholder).
+              - 조치 완료: 없음 (기반 구조만 존재).
+              - 차기 액션: (1) 공식(waveshareteam) 저장소에서 기구학/링크 정보 수집 → (2) URDF→USD 변환(Isaac 내 import) 또는 Isaac 내장 articulations 매핑 스크립트 작성.
+              - 리스크: 링크/조인트 명명 불일치 → 매핑 테이블 필요.
+
+        B. Isaac 시뮬레이션 런타임 구동
+              - 현재 상태: Isaac 번들 Python 분리 스크립트 `run_isaac_tool.sh` 확보.
+              - 조치 완료: Dual 환경 의사결정 / 분리 실행 경로 정리.
+              - 차기 액션: GUI 모드에서 빈 Stage 로딩 + 로봇 USD 삽입 smoke test.
+
+        C. 관측 (Observation) 파이프라인
+              - 현재 상태: Generic obs schema (`q`, `dq`, `sim_time`) 정의 및 테스트 통과.
+              - 추가 필요: 실제 RoArm M3 조인트 순서/개수 확정 후 schema version bump 결정.
+              - 차기 액션: 조인트 개수 확정 → `obs_action_schema.json`에 `joint_names` optional 필드 확장.
+
+        D. 행동 (Action) 적용 루프
+              - 현재 상태: 게이트웨이 dummy/detached 방식 (시뮬 articulation 제어 함수 미접속).
+              - 차기 액션: Isaac API (ArticulationView / set_joint_positions or delta) 호출 wrapper 추가 (`src/adapters/isaac_api_adapter.py` 확장).
+              - 성능 기준: 왕복 p95 < 60ms 유지 (현재 TCP 경로 기준 도구는 마련; 실제 Isaac loop 미측정).
+
+        E. 정책 추론 연동
+              - 현재 상태: SB3 / Torch / Dummy 정책 로딩 및 추론 경로 동작.
+              - 추가 필요: 실제 관측 차원과 정책 네트워크 입출력 차원 정합.
+              - 차기 액션: 로봇 조인트 수 기반 dummy rollout → PPO 학습 스크립트 관찰/행동 차원 재설정.
+
+        F. 학습 루프 (RL)와 실시간 시뮬 통합
+              - 현재 상태: 분리 환경 간 TCP IPC 라운드트립/지연 측정 도구 존재(`measure_round_trip.py`, `bench_transport.py`).
+              - 추가 필요: Isaac Sim tick → observation 캡처 → gateway 전송 → 정책 action 수신 → articulation 적용 주기(Hz) 타이밍 루프.
+              - 차기 액션: 1) Isaac side loop pseudo-code 작성 2) 10Hz → 30Hz → 목표 60Hz 단계적 측정.
+
+        G. 관측성 / 포렌식 / 드리프트
+              - 현재 상태: latency 전수+슬라이딩 quantile, deadline miss, rand_hash mismatch forensic, drift 분석 스크립트 완비.
+              - 추가 필요: 조인트 saturation / invalid torque 등 물리기반 경고 지표.
+              - 차기 액션: Isaac API 통합 후 조인트 범위 초과 카운터 도입.
+
+        H. 성능 & SLA
+              - 현재 상태: 정책 추론 부분에 한정된 latency 측정; 실제 시뮬 step 포함 전체 루프 미측정.
+              - 차기 액션: end-to-end (sim step + serialize + network + infer + apply) 측정 wrapper 삽입.
+
+        I. 재현성 & 버전 규율
+              - 현재 상태: hash echo, mismatch counter, forensic log, drift analyzer, git hash 메타 구조 존재.
+              - 추가 필요: 로봇 자산(USD) 버전 tag + domain randomization seed freeze 스냅샷 자동 저장.
+
+        J. 성공 정의 (Mid-Goal Completion Criteria 제안)
+              - Isaac GUI에서 RoArm M3 모델 시각화 성공.
+              - 1 episode dummy PPO rollout (≥ 100 step)에서 관측/행동 교환 p95 < 60ms.
+              - mismatch counter 증가 0 (또는 tolerable <0.1%) 유지.
+              - deadline_miss_rate < 0.02.
+              - drift 분석 스크립트 실행 시 신규 cluster 없음 (Baseline 대비).
+
+5. 다음 우선 실행 추천 순서
+ 1) RoArm M3 조인트/링크 스펙 수집 및 USD/URDF 확보
+ 2) Isaac Stage 로딩 + ArticulationView 제어 smoke test
+ 3) 관측/행동 schema 확장 (joint_names, action scaling 옵션)
+ 4) Isaac side control loop → gateway 라운드트립 통합 (Hz 측정)
+ 5) PPO 입력/출력 차원 정합 후 단기 학습 실험 (1000 step)
+ 6) End-to-End latency + SLA 기록 (PERF_BASELINE.md 작성)
+ 7) 조인트 범위/토크 이상 지표 추가 → Prometheus 노출
+ 8) Auto transport escalate 조건(p95>60ms) 자동 메시지 구현
+
+6. 리스크 요약 & 대응 (Mid-Goal 관점)
+ | 리스크 | 영향 | 현재 대비 | 추가 대응 |
+ |--------|------|-----------|-----------|
+ | 로봇 USD/URDF 부재 | 전체 일정 지연 | 구조만 구축 | 외부 repo 분석 → 변환 스크립트 |
+ | 조인트 매핑 오류 | 학습 실패/불안정 | 미발생(미통합) | 매핑 검증 테스트 (expected len) |
+ | Latency 증가 (sim 포함) | 제어 주파수 제한 | 정책 추론만 측정 | end-to-end 측정 후 병목 분해 |
+ | Drift (randomization hash) | 재현성 불가 | forensic 지원 | baseline hash set 스냅샷 자동화 |
+ | Deadline miss 다발 | 안정성 저하 | SLA 경고 가능 | transport/loop 최적화, ZeroMQ 검토 |
+
+7. 변경 로그(이 문서에 한정)
+ - 2025-10-08: 최초 진행 현황/세부 중간 목표 구조 추가.
