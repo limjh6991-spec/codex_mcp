@@ -36,6 +36,8 @@ class IsaacControlServer:
         self.session_active = False
         # TODO: 실제 Isaac 환경 핸들/Env 인스턴스 참조 (주입 or lazy init)
         self._last_joint_state = {"positions": [], "velocities": []}
+        self._policy = None
+        self._policy_path = None
 
     @timed
     def start_sim(self, headless: bool = False) -> Dict[str, Any]:
@@ -75,6 +77,50 @@ class IsaacControlServer:
         self._last_joint_state = {"positions": targets, "velocities": [0.0] * len(targets)}
         return {"status": "ok", "count": len(targets)}
 
+    @timed
+    def policy_infer(self, observation: list[float] | None = None, policy_path: str | None = None, deterministic: bool = True) -> Dict[str, Any]:
+        """Run inference using a saved SB3 policy.
+
+        Parameters
+        ----------
+        observation : list[float]
+            Raw observation vector; if None uses last_joint_state positions padded.
+        policy_path : str
+            Path to policy zip. If provided and differs from currently loaded, reloads.
+        deterministic : bool
+            Deterministic inference flag.
+        """
+        try:
+            from stable_baselines3 import PPO  # lazy import
+            import numpy as np
+        except Exception:
+            return {"error": "stable_baselines3 not available"}
+        if policy_path and policy_path != self._policy_path:
+            try:
+                self._policy = PPO.load(policy_path)
+                self._policy_path = policy_path
+            except Exception as e:  # noqa
+                return {"error": f"failed to load policy: {e}"}
+        if self._policy is None:
+            return {"error": "no policy loaded; provide policy_path"}
+        if observation is None:
+            base = self._last_joint_state.get("positions", [])
+            observation = list(base)
+        obs_arr = np.array(observation, dtype=float)
+        if obs_arr.ndim == 1:
+            obs_arr = obs_arr[None, :]
+        try:
+            action, _ = self._policy.predict(obs_arr, deterministic=deterministic)
+            action_list = action[0].tolist() if action.ndim > 1 else action.tolist()
+        except Exception as e:  # noqa
+            return {"error": f"inference failed: {e}"}
+        return {
+            "action": action_list,
+            "policy_path": self._policy_path,
+            "deterministic": deterministic,
+            "obs_dim": int(obs_arr.shape[-1]),
+        }
+
     def schema(self) -> Dict[str, Any]:
         return {
             "tools": [
@@ -85,6 +131,7 @@ class IsaacControlServer:
                 {"name": "apply_action", "params": {"joints_delta": "List[float]"}},
                 {"name": "get_joint_state", "params": {}},
                 {"name": "set_joint_targets", "params": {"targets": "List[float]"}},
+                {"name": "policy_infer", "params": {"observation": "Optional[List[float]]", "policy_path": "Optional[str]", "deterministic": "bool"}},
             ]
         }
 

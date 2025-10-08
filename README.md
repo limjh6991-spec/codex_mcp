@@ -151,6 +151,18 @@ python sim/inspect_stage.py --usd /absolute/path/to/roarm.usd --update-joints
 ```
 `--update-joints` 실행 시 `configs/roarm_joints.yaml` 조인트 목록 갱신 (기존 limit 유지 or 기본값 -3.14~3.14).
 
+### Isaac Integration Increment 메모 (I1/I2)
+진행 중인 Isaac 연동 단계 기록:
+| Increment | 내용 | 상태 |
+|-----------|------|------|
+| I1 | JointAPI get_state/apply_delta 기본 스켈레톤 + fallback | 완료 |
+| I2 | World 기반 ArticulationView attach 시도, list_joints 동적 탐색 | 완료 |
+| I3 | (예정) 실제 joint positions/velocities fetch → obs 반영 | 예정 |
+| I4 | (예정) apply_delta limit-aware clamp + drive targets 적용 | 예정 |
+| I5 | (예정) physics_randomizer 실제 PhysX 파라미터 매핑 | 예정 |
+
+추후 I3~I5 완료 후: RL loop에 실제 Isaac step(s) 삽입 및 RolloutLogger 메타에 articulation/joint hash 기록 예정.
+
 ## MCP Joint Tool (스켈레톤)
 현재 서버(`isaac_controller_server.py`)에 포함된 Joint 관련 placeholder tool:
 - `get_joint_state()` : 최근 저장된 joint 상태 반환 (실제 Isaac 연동 전까지 mock)
@@ -163,6 +175,42 @@ python sim/inspect_stage.py --usd /absolute/path/to/roarm.usd --update-joints
 3. apply_action → delta 누적 후 clamp → target 반영
 - [ ] 실물 로봇 ROS2 Bridge (action/observation topic)
 - [ ] MCP: 정책 평가 tool (policy_infer), 데이터 수집 tool (rollout_capture)
+### 정책 추론 (policy_infer)
+`mcp_servers/isaac_controller_server.py`에 `policy_infer` tool이 추가되었습니다.
+
+입력 파라미터:
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| observation | Optional[List[float]] | 관측 벡터 (생략 시 마지막 joint positions 기반) |
+| policy_path | Optional[str] | SB3 저장 정책 zip 경로 (미지정 + 미로드 상태면 오류) |
+| deterministic | bool | 결정적 행동 여부 |
+
+출력 예시:
+```json
+{
+  "action": [0.01, -0.02, 0.0, 0.0, 0.0, 0.01],
+  "policy_path": "policies/ppo_dummy_roarm.zip",
+  "deterministic": true,
+  "obs_dim": 18
+}
+```
+
+정책이 아직 로드되지 않았다면 `policy_path`를 반드시 제공해야 하며, 다른 경로 전달 시 자동 재로딩합니다.
+
+### 콜백 기반 Rollout 저장
+`train_ppo.py` 실행 시:
+| 플래그 | 설명 |
+|--------|------|
+| `--record-rollouts` | 수동 루프 기반 RolloutLogger (학습 대신 샘플 수집 중심) |
+| `--record-callback-rollouts` | 학습(process_bar 포함) 진행 중 SB3 Callback으로 에피소드 자동 저장 |
+
+두 플래그는 동시에 사용할 수 없으며, `--record-callback-rollouts` 경로는 정책 학습과 로그 수집을 동시에 수행합니다.
+
+meta.json 확장 필드:
+| 필드 | 설명 |
+|------|------|
+| `randomization` | 마지막 도메인 랜덤라이제이션 샘플 |
+| `physics_report` | physics_randomizer 적용 상세 (solver iterations 등) |
 - [ ] 실험 관리 (Hydra/Weights & Biases 선택 검토)
 
 ## 보안/비밀 관리

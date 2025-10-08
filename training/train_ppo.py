@@ -56,6 +56,7 @@ def main():
     parser.add_argument("--total_timesteps", type=int, default=10_000)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--record-rollouts", action="store_true", help="Save rollout episodes (simple logger, single-env only)")
+    parser.add_argument("--record-callback-rollouts", action="store_true", help="Use SB3 callback to save episodes during learning")
     parser.add_argument("--reward-config", type=str, default=None, help="Path to reward_config.yaml")
     parser.add_argument("--tracking-weight", type=float, default=None)
     parser.add_argument("--smoothness-weight", type=float, default=None)
@@ -83,13 +84,28 @@ def main():
 
     model = PPO(cfg.policy, vec_env, verbose=1)
 
-    if args.record_rollouts:
+    if args.record_rollouts and args.record_callback_rollouts:
+        raise SystemExit("Choose only one of --record-rollouts or --record-callback-rollouts")
+
+    if args.record_callback_rollouts:
+        from src.utils.rollout_callback import RolloutCallback
+        callback = RolloutCallback(reward_terms=["tracking", "smoothness", "goal_bonus", "action_penalty"])  # reward terms placeholder
+        model.learn(total_timesteps=cfg.total_timesteps, progress_bar=True, callback=callback)
+        model.save("policies/ppo_dummy_roarm")
+        print("Saved policy to policies/ppo_dummy_roarm.zip (callback rollouts)")
+    elif args.record_rollouts:
         # Manual rollout collection (not via SB3 callback to keep simple)
         from src.utils.rollout_logger import RolloutLogger
         import os
         os.makedirs("policies", exist_ok=True)
         env_adapter = vec_env.envs[0]  # DummyVecEnv single
-        logger = RolloutLogger(env_info={"obs_dim": env_adapter.env.OBS_DIM, "action_dim": env_adapter.env.ACTION_DIM}, reward_terms=["tracking", "smoothness", "goal_bonus", "action_penalty"])
+        # Placeholder: Dummy 환경은 randomization/physics_report 없음 → None 전달
+        logger = RolloutLogger(
+            env_info={"obs_dim": env_adapter.env.OBS_DIM, "action_dim": env_adapter.env.ACTION_DIM},
+            reward_terms=["tracking", "smoothness", "goal_bonus", "action_penalty"],
+            randomization=getattr(env_adapter.env, "randomization", None),
+            physics_report=None,
+        )
         total_steps = 0
         obs = env_adapter.reset()
         logger.begin_episode(obs)

@@ -37,9 +37,10 @@ class RolloutMeta:
     git: str
     created: str
     randomization: Optional[Dict[str, Any]] = None
+    physics_report: Optional[Dict[str, Any]] = None
 
 class RolloutLogger:
-    def __init__(self, root: str = "rollouts", env_info: Dict[str, Any] | None = None, reward_terms: List[str] | None = None, randomization: Dict[str, Any] | None = None):
+    def __init__(self, root: str = "rollouts", env_info: Dict[str, Any] | None = None, reward_terms: List[str] | None = None, randomization: Dict[str, Any] | None = None, physics_report: Dict[str, Any] | None = None):
         self.root = root
         self.dir = _timestamp_dir(root)
         self.episodes = 0
@@ -49,6 +50,7 @@ class RolloutLogger:
             git=_git_commit(),
             created=time.strftime("%Y-%m-%dT%H:%M:%S"),
             randomization=randomization,
+            physics_report=physics_report,
         )
         with open(os.path.join(self.dir, "meta.json"), "w", encoding="utf-8") as f:
             json.dump(asdict(meta), f, ensure_ascii=False, indent=2)
