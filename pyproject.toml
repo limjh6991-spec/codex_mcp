@@ -11,30 +11,46 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "MIT"}
 
-# 코어 학습/시뮬레이션 의존성 (최소 셋)
+# 코어 최소 의존성 (MCP + 기본 유틸 위주, RL/학습 프레임워크 제외)
 dependencies = [
-  "torch>=2.3.0",
-  "numpy",
-  "gymnasium>=0.29.0",
-  "stable-baselines3>=2.3.0",
-  "tyro",  # CLI config
-  "omegaconf",
-  "pydantic>=2.6.0",
-  "pyyaml",
-  "rich",
-  "tqdm",
-  "fastapi",
-  "uvicorn",
-  "websockets",
-  "msgpack",
-  "orjson",
-  "pytest",
+  "numpy>=1.26.0,<3.0.0",
+  "pydantic>=2.6.0,<3.0.0",
+  "pyyaml>=6.0.0,<7.0.0",
+  "rich>=13.0.0,<14.0.0",
+  "tqdm>=4.0.0,<5.0.0",
+  "fastapi>=0.110.0,<0.112.0",
+  "uvicorn>=0.29.0,<0.31.0",
+  "websockets>=12.0,<13.0",
+  "msgpack>=1.0.0,<2.0.0",
+  "orjson>=3.9.0,<4.0.0",
 ]
 
 [project.optional-dependencies]
 # Isaac Sim Python 패키지는 별도 (NVIDIA 배포) - 런타임시 PYTHONPATH 추가
 sim = [
-  "pyquaternion",
+  "pyquaternion>=0.9.9,<0.10.0",
+]
+
+# 강화학습 / 학습 관련 (무거운 스택)
+rl = [
+  "torch>=2.3.0,<2.4.0",
+  "gymnasium>=0.29.0,<0.30.0",
+  "stable-baselines3>=2.3.0,<2.4.0",
+  "tyro>=0.8.0,<0.9.0",
+  "omegaconf>=2.3.0,<2.4.0",
+]
+
+# 개발/테스트 품질 도구
+dev = [
+  "pytest>=8.0.0,<9.0.0",
+  "ruff>=0.5.0,<0.6.0",
+  "black>=24.4.0,<25.0.0",
+  "mypy>=1.8.0,<1.11.0",
+]
+
+# 전체 번들 (편의)
+all = [
+  "codex-mcp-rl[rl,sim,dev]",
 ]
 
 [tool.setuptools.packages.find]

@@ -5,22 +5,22 @@ from stable_baselines3.common.callbacks import BaseCallback
 from .rollout_logger import RolloutLogger
 
 class RolloutCallback(BaseCallback):
-        """Episode-level rollout saver supporting single or multi-env VecEnv.
+    """Episode-level rollout saver supporting single or multi-env VecEnv.
 
-        Behaviors:
-            * Captures initial randomization & physics_report only from env[0] (heuristic) at start.
-            * For multi-env, maintains per-env buffers and writes separate ep files with suffix _env{i}.
-            * Reward terms list is metadata only (actual term logging handled externally if needed).
-        """
-        def __init__(self, reward_terms: Optional[List[str]] = None, verbose: int = 0):
-                super().__init__(verbose)
-                self.reward_terms = reward_terms or []
-                self.logger_obj: Optional[RolloutLogger] = None
-                # single-env legacy buffers
-                self._episode_start_obs: Optional[np.ndarray] = None
-                # multi-env buffers: env_id -> dict(buffers)
-                self._multi_buffers: Dict[int, Dict[str, Any]] = {}
-                self._is_multi = False
+    Behaviors:
+        * Captures initial randomization & physics_report only from env[0] (heuristic) at start.
+        * For multi-env, maintains per-env buffers and writes separate ep files with suffix _env{i}.
+        * Reward terms list is metadata only (actual term logging handled externally if needed).
+    """
+    def __init__(self, reward_terms: Optional[List[str]] = None, verbose: int = 0):
+        super().__init__(verbose)
+        self.reward_terms = reward_terms or []
+        self.logger_obj: Optional[RolloutLogger] = None
+        # single-env legacy buffers
+        self._episode_start_obs: Optional[np.ndarray] = None
+        # multi-env buffers: env_id -> dict(buffers)
+        self._multi_buffers: Dict[int, Dict[str, Any]] = {}
+        self._is_multi = False
 
     def _on_training_start(self) -> None:
         n_envs = getattr(self.training_env, 'num_envs', 1)
@@ -29,13 +29,24 @@ class RolloutCallback(BaseCallback):
         inner_env0 = getattr(env0, 'env', env0)
         rand = getattr(inner_env0, 'randomization', None)
         physics_report = getattr(inner_env0, 'physics_report', None)
+        # Reward term introspection
+        reward_terms = list(self.reward_terms)
+        reward_weights = None
+        composer = getattr(inner_env0, '_reward_composer', None)
+        try:
+            if composer is not None:
+                # discover term keys & weights
+                reward_terms = composer.get_term_keys()
+                reward_weights = composer.get_weight_map()
+        except Exception:  # noqa
+            pass
         env_info = {
             'obs_dim': getattr(inner_env0, 'OBS_DIM', None),
             'action_dim': getattr(inner_env0, 'ACTION_DIM', None),
             'env_class': inner_env0.__class__.__name__,
             'num_envs': n_envs,
         }
-        self.logger_obj = RolloutLogger(env_info=env_info, reward_terms=self.reward_terms, randomization=rand, physics_report=physics_report)
+        self.logger_obj = RolloutLogger(env_info=env_info, reward_terms=reward_terms, randomization=rand, physics_report=physics_report, reward_weights=reward_weights)
         obs = self.training_env.reset()
         if not self._is_multi:
             self._episode_start_obs = obs[0] if isinstance(obs, (list, tuple)) else obs

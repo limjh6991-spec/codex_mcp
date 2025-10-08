@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build-test:
+    name: Test (core)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - name: Install dependencies (core+dev)
+        run: |
+          python -m pip install --upgrade pip
+          pip install .[dev]
+      - name: Lint (ruff)
+        run: ruff check . --output-format=github || true
+      - name: Format check (black)
+        run: black --check .
+      - name: Run tests
+        run: pytest -q
+
+  build-test-rl:
+    name: Test (rl extras)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - name: Install dependencies (rl+sim+dev)
+        run: |
+          python -m pip install --upgrade pip
+          pip install .[rl,sim,dev]
+      - name: Lint (ruff)
+        run: ruff check . --output-format=github || true
+      - name: Format check (black)
+        run: black --check .
+      - name: Run tests
+        run: pytest -q

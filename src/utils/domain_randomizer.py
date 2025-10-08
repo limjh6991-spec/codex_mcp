@@ -12,12 +12,15 @@ robot:
 """
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
+from pathlib import Path
+import json
 import yaml
 import random
 
 @dataclass
 class DomainRandomizer:
     config: Dict[str, Any]
+    log_path: Optional[str] = None  # JSONL path for coverage logging (each new sample appended)
     _last_sample: Optional[Dict[str, Any]] = field(default=None, init=False, repr=False)
 
     @classmethod
@@ -27,8 +30,24 @@ class DomainRandomizer:
         return cls(config=data)
 
     def sample(self, force: bool = False) -> Dict[str, Any]:
+        """Return (and lazily generate) a randomization sample.
+
+        If log_path is specified and a new sample is generated (either first
+        time or force=True), append it as a JSON line for coverage analysis.
+        """
+        regenerated = False
         if self._last_sample is None or force:
             self._last_sample = self._sample_recursive(self.config)
+            regenerated = True
+        if regenerated and self.log_path:
+            try:
+                p = Path(self.log_path)
+                p.parent.mkdir(parents=True, exist_ok=True)
+                with p.open("a", encoding="utf-8") as f:
+                    json.dump(self._last_sample, f, ensure_ascii=False)
+                    f.write("\n")
+            except Exception:  # pragma: no cover - logging best-effort
+                pass
         return self._last_sample
 
     def last_sample(self) -> Optional[Dict[str, Any]]:

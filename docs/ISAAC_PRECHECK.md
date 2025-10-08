@@ -6,6 +6,8 @@
 - 설치 파일: `isaac-sim-standalone-5.0.0-linux-x86_64.zip`
 - 실제 설치 디렉토리 존재 여부: $ISAAC_SIM_PATH
 - 버전 확인: `$ISAAC_SIM_PATH/version.txt` 또는 GUI Help > About
+ - 환경 변수 권장: `export ISAAC_SIM_ROOT=/home/roarm_m3/isaac_sim` (또는 실제 설치 경로)
+ - 자동 버전 출력: `python scripts/print_isaac_version.py` (omni import 실패 시 후보 경로/스크립트 안내)
 
 ## 2. SDK / Python API 환경
 - `$ISAAC_SIM_PATH/setup_python_env.sh` 실행 후 `python scripts/check_isaac_import.py`
@@ -32,6 +34,14 @@
 
 ## 6. Precheck 스크립트
 `bash scripts/isaac_precheck.sh` 실행 → 환경 변수 / 디렉토리 / 버전 / 모듈 임포트 순차 점검.
+
+추가 확인 순서 (수동):
+```bash
+export ISAAC_SIM_ROOT=/home/roarm_m3/isaac_sim
+source $ISAAC_SIM_ROOT/setup_python_env.sh
+python scripts/print_isaac_version.py  # JSON 출력 확인
+python scripts/check_isaac_import.py   # 핵심 모듈 임포트 결과
+```
 
 ## 7. 수동 점검 (AI 인지가 어려운 GUI 항목)
 - 메뉴 위치 차이: Help > About (버전), Window > Extensions (플러그인 충돌 여부)

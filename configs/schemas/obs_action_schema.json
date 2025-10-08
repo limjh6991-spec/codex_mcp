@@ -1,0 +1,112 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "schema_version": 1,
+    "title": "RoArmM3 Obs/Action Schema",
+    "type": "object",
+    "required": [
+        "schema_version",
+        "observation",
+        "action"
+    ],
+    "properties": {
+        "schema_version": {
+            "type": "integer",
+            "minimum": 1
+        },
+        "timestamp_wall": {
+            "type": "number"
+        },
+        "timestamp_sim": {
+            "type": [
+                "number",
+                "null"
+            ]
+        },
+        "observation": {
+            "type": "object",
+            "required": [
+                "obs_version",
+                "q",
+                "dq"
+            ],
+            "properties": {
+                "obs_version": {
+                    "type": "integer"
+                },
+                "q": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "dq": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "goal_delta": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "extra": {
+                    "type": [
+                        "object",
+                        "null"
+                    ]
+                }
+            }
+        },
+        "action": {
+            "type": "object",
+            "required": [
+                "action_version",
+                "delta"
+            ],
+            "properties": {
+                "action_version": {
+                    "type": "integer"
+                },
+                "delta": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "raw_policy": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "rate_limited": {
+                    "type": "boolean"
+                },
+                "clipped": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "rand_hash": {
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "episode_id": {
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "step_index": {
+            "type": [
+                "integer",
+                "null"
+            ],
+            "minimum": 0
+        }
+    }
+}

@@ -52,6 +52,7 @@ class RewardComposer:
     def __init__(self, cfg: RewardConfig | None = None, terms: List[RewardTerm] | None = None):
         self.cfg = cfg or RewardConfig()
         self.terms = terms or [term_tracking, term_smoothness, term_action_penalty, term_goal_bonus]
+        self._term_keys_cache: List[str] | None = None
 
     def compute(self, q: np.ndarray, dq: np.ndarray, goal: np.ndarray, action: np.ndarray | None = None) -> Dict[str, float]:
         out: Dict[str, float] = {}
@@ -64,7 +65,27 @@ class RewardComposer:
             if k.endswith("_term"):
                 total += v
         out["reward"] = float(total)
+        # Cache term key order on first compute
+        if self._term_keys_cache is None:
+            self._term_keys_cache = [k for k in out.keys() if k.endswith("_term")]
         return out
+
+    # --- Introspection Helpers ---
+    def get_term_keys(self) -> List[str]:
+        if self._term_keys_cache is not None:
+            return list(self._term_keys_cache)
+        # Fallback: generate using zero dummy arrays (length heuristic: assume 1)
+        dummy = np.zeros(1, dtype=float)
+        _ = self.compute(dummy, dummy, dummy, action=None)
+        return list(self._term_keys_cache or [])
+
+    def get_weight_map(self) -> Dict[str, float]:
+        return {
+            "tracking_term": self.cfg.tracking_weight,
+            "smoothness_term": self.cfg.smoothness_weight,
+            "action_penalty_term": self.cfg.action_penalty_weight,
+            "goal_bonus_term": self.cfg.goal_bonus,
+        }
 
 def compute_reward(q: np.ndarray, dq: np.ndarray, goal: np.ndarray, cfg: RewardConfig | None = None) -> Dict[str, float]:  # backward compat (no action)
     composer = RewardComposer(cfg)
