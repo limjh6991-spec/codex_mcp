@@ -22,8 +22,23 @@ codex_mcp/
   ├─ sim/                          # Isaac 관련 스테이지 / USD 등 (추가 예정)
   ├─ real/                         # 실물 로봇 드라이버/ROS2 브릿지 (추가 예정)
   ├─ scripts/                      # 런처/툴 스크립트
+  │    ├─ run_isaac_tool.sh        # Isaac 번들 Python 래퍼 (이중 환경 경계)
+  │    ├─ ipc_policy_gateway.py    # 관측→액션 IPC TCP 게이트웨이 (정책 로딩 + SLA 모니터)
+  │    ├─ run_tests_local.sh       # Isaac PYTHONPATH 오염 없이 테스트 실행
   └─ tests/                        # 기본 테스트
 ```
+
+## Dual Environment (이중 Python 런타임) 요약
+Isaac Sim 번들 Python(3.11)과 RL/분석 venv(예: 3.12)를 분리하여 버전 충돌(SRE mismatch 등)을 방지합니다.
+
+핵심 포인트:
+- RL 측: `.venv` / 시스템 Python → 학습, 분석, 정책 로딩
+- Isaac 측: `run_isaac_tool.sh` → Isaac 번들 모듈 접근 전용
+- 경계(IPC): `ipc_policy_gateway.py` (TCP line-delimited JSON)
+- 데이터 계약: `configs/schemas/obs_action_schema.json` (schema_version 유지)
+
+자세한 의사결정 배경: `docs/ARCH_DECISION_DUAL_ENV.md`
+프로토콜 상세: `docs/IPC_BRIDGE.md`
 
 ## 설치
 Python 3.12 환경 권장:
@@ -87,6 +102,9 @@ print(env.randomization)  # 샘플된 파라미터 확인
 | `scripts/check_isaac_import.py` | Isaac 핵심 모듈 임포트 가능 여부 검사 |
 | `scripts/run_mcp_isaac.sh` | 환경 변수 확인 후 MCP 서버 실행 |
 | `scripts/run_training.sh` | 학습 실행 + 로그 디렉토리 생성 |
+| `scripts/run_isaac_tool.sh` | Isaac 번들 Python 실행 (이중 환경 분리) |
+| `scripts/ipc_policy_gateway.py` | 관측→액션 TCP IPC 게이트웨이 stub |
+| `scripts/run_tests_local.sh` | 깨끗한 PYTHONPATH로 pytest 실행 |
 
 ## .env 예시
 `.env.example`를 복사하여 `.env` 생성:
@@ -135,6 +153,57 @@ rollouts/
 ## 추가 문서
 - 로드맵: `docs/ROADMAP.md`
 - Isaac 사전 점검: `docs/ISAAC_PRECHECK.md`
+- ROS2 브릿지 설계 초안: `docs/ROS2_BRIDGE.md`
+- Sim2Real 심화 가이드: `docs/SIM2REAL_GUIDE.md`
+- 테스트 환경 격리: `docs/TEST_ENV_ISOLATION.md`
+- Dual Env 결정: `docs/ARCH_DECISION_DUAL_ENV.md`
+- IPC 프로토콜: `docs/IPC_BRIDGE.md`
+
+## IPC 게이트웨이 사용
+정책 추론 + 관측/행동 직렬화 + SLA / 관측성 기능을 제공하는 TCP line-delimited JSON 게이트웨이:
+
+```bash
+python scripts/ipc_policy_gateway.py
+```
+
+다른 터미널에서 핑 + 관측 전송:
+```bash
+python - <<'PY'
+import socket, json
+s = socket.create_connection(("127.0.0.1", 45123))
+for m in [{"type":"ping"}, {"type":"obs", "data":{"q":[0,1,2]}}]:
+  s.sendall(json.dumps(m).encode()+b"\n")
+  print(s.recv(4096).decode().strip())
+PY
+```
+
+핵심 특징:
+- SB3 PPO zip / Torch (.pt/.pth) / dummy linear 정책 로딩 (지연 로딩)
+- JSON Schema (fastjsonschema fallback jsonschema) 검증
+- Correlation ID 기반 이벤트 JSONL 로깅 + 크기 기반 rotation(+gzip)
+- Latency 전수 통계 + 최근 슬라이딩 윈도 p50/p90/p95/p99
+- Watchdog deadline 초과 시 zero-action 안전 fallback + deadline_miss 플래그
+- Randomization hash echo & mismatch 포렌식 로그(`hash_mismatch_events.jsonl`)
+- SLA 알림(p95 latency, deadline_miss_rate) 이벤트 + cooldown
+- Prometheus textfile export (`gateway_metrics.prom`) for node exporter
+- CSV 라운드트립 측정 스크립트 (`measure_round_trip.py --csv`)
+
+## 스키마 파일
+`configs/schemas/obs_action_schema.json` 은 관측/액션 교환의 최소 계약을 정의합니다. 상위 `schema_version` 필드는 wire 호환성 관리에 사용됩니다.
+
+테스트로 기본 구조 확인:
+```bash
+env -i PATH=$PATH HOME=$HOME TERM=$TERM python3 -m pytest tests/test_schema_file.py -q
+```
+
+## 테스트 환경 분리 (요약)
+Isaac 환경이 `PYTHONPATH`를 전역 오염 시키면 `SRE module mismatch` 발생 가능 → RL/테스트 실행 시 아래 중 하나 사용:
+```bash
+./scripts/run_tests_local.sh
+# 혹은
+env -i PATH=$PATH HOME=$HOME TERM=$TERM python3 -m pytest -q
+```
+상세 가이드는 추후 별도 문서/섹션 확장 예정.
 
 ## Isaac Stage 로더 프로토타입
 RoArm M3 USD 로딩 테스트:
@@ -216,11 +285,13 @@ meta.json 확장 필드:
 ## 보안/비밀 관리
 `.env` 파일 사용: API_KEY, MODEL_ENDPOINT 등. VS Code Settings Sync 제외 권장.
 
-## 로깅 & 관측성
-- 학습: SB3 logger
-- MCP: 추후 request/response JSON 로깅 + latency 측정
-- Rollout: `--record-rollouts` 사용 시 episode 단위 NPZ + meta.json 저장
-- Randomization: 마지막 샘플 캐시(`DomainRandomizer.last_sample()`) → 추후 meta 확장 예정
+## 로깅 & 관측성 요약
+- 이벤트: `logs/ipc_gateway_events.jsonl` (회전 + gzip 선택) / alert 이벤트 포함
+- 메트릭: `logs/ipc_metrics.json` (full + recent quantiles, counters, SLA 상태)
+- Prometheus: `logs/gateway_metrics.prom` (textfile collector)
+- 해시 불일치 포렌식: `logs/hash_mismatch_events.jsonl`
+- 라운드트립 벤치: `scripts/measure_round_trip.py`
+세부 내용은 `docs/OBSERVABILITY.md` 참고.
 
 ## 테스트
 간단 smoke test 추가 예정:

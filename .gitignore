@@ -10,7 +10,12 @@ venv/
 
 # Logs
 logs/
+!logs/README.md
 *.log
+*.jsonl
+*.jsonl.*
+*.prom
+*.gz
 
 # RL artifacts
 policies/*.zip
