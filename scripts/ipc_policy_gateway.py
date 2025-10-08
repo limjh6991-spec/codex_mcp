@@ -93,6 +93,7 @@ _metrics_interval_sec = 5.0
 _metrics_thread_started = False
 _deadline_miss_count = 0
 _rand_hash_mismatch_count = 0
+_joint_limit_violation_count = 0  # future increment when limits enforced
 
 def _record_latency(ms: float):
     global _lat_count, _lat_sum, _lat_sum_sq, _lat_min, _lat_max
@@ -163,6 +164,7 @@ def _flush_metrics():
                 'counters': {
                     'deadline_miss': _deadline_miss_count,
                     'rand_hash_mismatch': _rand_hash_mismatch_count,
+                    'joint_limit_violation': _joint_limit_violation_count,
                     'deadline_miss_rate': round((_deadline_miss_count / count) if count else 0.0, 6),
                 },
                 'updated_ts': time.time(),
@@ -269,6 +271,28 @@ def _flush_metrics():
                 _last_alert_ts = now
             _last_latency_severity = sev_latency
             _last_deadline_miss_severity = sev_miss
+            # Transport escalate advisory: sustained p95 above threshold
+            try:
+                global _auto_transport_escalate_p95
+            except NameError:
+                _auto_transport_escalate_p95 = None
+            if '_transport_escalate_consec' not in globals():
+                global _transport_escalate_consec
+                _transport_escalate_consec = 0
+            if _auto_transport_escalate_p95 is not None and p95 is not None:
+                if p95 > _auto_transport_escalate_p95:
+                    _transport_escalate_consec += 1
+                else:
+                    _transport_escalate_consec = 0
+                if _transport_escalate_consec >= 3:
+                    _write_event({
+                        'phase': 'advisory',
+                        'type': 'transport_escalate',
+                        'p95': p95,
+                        'threshold': _auto_transport_escalate_p95,
+                        'message': 'Sustained high p95 latency. Evaluate ZeroMQ / shared memory transport.'
+                    })
+                    _transport_escalate_consec = 0
         except Exception:
             pass
     return snapshot
@@ -632,6 +656,8 @@ def main():
     parser.add_argument("--prometheus-textfile", type=str, default=None, help="Write Prometheus textfile metrics to this path on each flush")
     parser.add_argument("--prometheus-instance-id", type=str, default=None, help="Instance identifier label value when label export enabled")
     parser.add_argument("--prometheus-enable-labels", action='store_true', help="Enable labeled Prometheus metrics (instance_id, policy_kind)")
+    parser.add_argument("--action-scale", type=float, default=None, help="Scale factor meta for raw policy action (exposed in action response as action_scale_hint)")
+    parser.add_argument("--auto-transport-escalate-p95", type=float, default=None, help="p95 ms threshold that if exceeded 3 consecutive flushes triggers advisory event")
     args = parser.parse_args()
     host = args.host
     port = args.port
@@ -654,6 +680,10 @@ def main():
     _prom_textfile = args.prometheus_textfile
     _prom_instance_id = args.prometheus_instance_id
     _prom_enable_labels = bool(args.prometheus_enable_labels)
+    global _action_scale_hint
+    _action_scale_hint = args.action_scale
+    global _auto_transport_escalate_p95
+    _auto_transport_escalate_p95 = args.auto_transport_escalate_p95
     _load_schema_validator()
     if args.policy:
         ok, detail = _load_policy_file(args.policy)

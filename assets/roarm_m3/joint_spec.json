@@ -1,0 +1,18 @@
+{
+  "name": "roarm_m3",
+  "version": 0,
+  "assumed_dof": 6,
+  "joints": [
+    {"name": "joint1", "axis": "z", "lower": -3.1415, "upper": 3.1415, "vel_max": 2.0},
+    {"name": "joint2", "axis": "y", "lower": -1.57, "upper": 1.57, "vel_max": 2.0},
+    {"name": "joint3", "axis": "y", "lower": -1.57, "upper": 1.57, "vel_max": 2.0},
+    {"name": "joint4", "axis": "z", "lower": -3.1415, "upper": 3.1415, "vel_max": 3.0},
+    {"name": "joint5", "axis": "y", "lower": -2.0, "upper": 2.0, "vel_max": 3.0},
+    {"name": "joint6", "axis": "z", "lower": -3.1415, "upper": 3.1415, "vel_max": 4.0}
+  ],
+  "notes": [
+    "All values are placeholders pending official RoArm M3 specification.",
+    "Update version and regenerate PPO policy once real kinematics confirmed.",
+    "Consider gripper or end-effector joints extension later."
+  ]
+}

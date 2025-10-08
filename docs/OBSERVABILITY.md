@@ -45,6 +45,7 @@ Example line (abbreviated):
   - `counters.deadline_miss`: 누적 deadline 초과 횟수 (action safe fallback 발생)
   - `counters.rand_hash_mismatch`: 예상 hash 대비 불일치 발생 누적 (재현성 drift 감지) — forensic 세부 항목은 `hash_mismatch_events.jsonl` 및 `scripts/analyze_hash_drift.py` 참고
   - `counters.deadline_miss_rate`: deadline_miss / total action count (비율, 0.0~1.0)
+  - `counters.joint_limit_violation`: (stub) 조인트 한계 초과 감지 카운터(Isaac articulation 통합 시 활성화 예정)
 
 ### 2.2 Recent Window Metrics
 `recent_latency_ms` 섹션: 마지막 최대 200개 샘플에 대한 p50/p90/p95/p99 추이(단기 편차 관찰용).
@@ -155,9 +156,10 @@ Change log:
 ## 14. Alert 운영 가이드 (초기)
 | 항목 | 초기 임계 | 연속 조건 | 후속 액션 |
 |------|----------|-----------|-----------|
-| p95 latency | 60ms | 3+ flush | 직렬화/네트워크 프로파일, ZeroMQ/SHM 검토 |
+| p95 latency | 60ms | 3+ flush | 직렬화/네트워크 프로파일, ZeroMQ/SHM 검토 (자동 advisory 가능: `--auto-transport-escalate-p95`) |
 | deadline_miss_rate | 0.02 | 2+ flush | 관측 벡터 축소, 정책 경량화 |
 | hash mismatch | >5 / min | 즉시 | seed 재확인, 랜덤화 구성 diff |
+| joint_limit_violation | TBD | 1+ (중요) | 관절 한계/스케일 조정, action scaling 재평가 |
 
 ---
 - v2: recent window metrics, deadline_miss_rate, log rotation, gzip, Prometheus export, SLA alerts, hash mismatch forensic log.

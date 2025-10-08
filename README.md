@@ -189,6 +189,9 @@ PY
 - CSV 라운드트립 측정 스크립트 (`measure_round_trip.py --csv`)
  - 전송 레이턴시 벤치마킹 (`bench_transport.py --mode tcp --samples 2000 --csv bench.csv`)
  - Hash mismatch forensic drift 분석 (`analyze_hash_drift.py --file logs/hash_mismatch_events.jsonl --csv drift.csv`)
+ - 자동 전송 에스컬레이션 어드바이저 (`--auto-transport-escalate-p95`) 3회 연속 초과 시 advisory 이벤트
+ - Action scaling 메타 (`--action-scale` → action 응답에 `action_scale_hint`)
+ - 확장 schema: `joint_names`, `action_scale_hint` (옵셔널)
 
 ## 스키마 파일
 `configs/schemas/obs_action_schema.json` 은 관측/액션 교환의 최소 계약을 정의합니다. 상위 `schema_version` 필드는 wire 호환성 관리에 사용됩니다.
