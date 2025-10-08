@@ -94,7 +94,7 @@ class IsaacRoArmM3Env(BaseSim2RealEnv):
         return obs.astype(np.float32)
 
     def step(self, action: np.ndarray):
-        from src.utils.reward import compute_reward  # local import to avoid cycles
+        from src.utils.reward import RewardComposer, RewardConfig  # local import to avoid cycles
         from src.utils.limits import apply_delta_with_limits
         # TODO: action → articulation drive command (joint_api.apply_delta)
         raw_action = np.array(action, dtype=float)
@@ -102,16 +102,16 @@ class IsaacRoArmM3Env(BaseSim2RealEnv):
         prev_q = self._q.copy()
         self._q = apply_delta_with_limits(self._q, action, self._limit_lower, self._limit_upper)
         self._dq = self._q - prev_q  # simplistic discrete velocity placeholder
-        reward_dict = compute_reward(self._q, self._dq, self._goal)
-        terminated = bool(reward_dict["within_tol"] > 0.0)
+        # Reward (composer cached per instance? simple recreate each call for now)
+        if not hasattr(self, "_reward_composer"):
+            self._reward_composer = RewardComposer(RewardConfig())
+        reward_dict = self._reward_composer.compute(self._q, self._dq, self._goal, action=action)
+        terminated = bool(reward_dict.get("within_tol", 0.0) > 0.0)
         truncated = self._step_count >= 499
         self._step_count += 1
         obs = self._get_obs()
-        info = {
-            "tracking_error": reward_dict["tracking_error"],
-            "smoothness": reward_dict["smoothness"],
-            "action_clipped": bool(np.any(raw_action != action)),
-        }
+        info = {k: v for k, v in reward_dict.items() if k.endswith("_term") or k in ("tracking_error", "smoothness", "within_tol")}
+        info["action_clipped"] = bool(np.any(raw_action != action))
         return obs, reward_dict["reward"], terminated, truncated, info
 
     def render(self, mode: str = "human"):
