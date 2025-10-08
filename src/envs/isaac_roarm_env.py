@@ -71,12 +71,12 @@ class IsaacRoArmM3Env(BaseSim2RealEnv):
     def apply_domain_randomization(self):  # type: ignore[override]
         # Call base to apply generic (which calls DomainRandomizer.apply if present)
         super().apply_domain_randomization()
-        # Additional physics-level specialization using sampled values
         if self._domain_randomizer and ISAAC_AVAILABLE:
             try:
-                sample = self._domain_randomizer.sample()
-                from src.utils.physics_randomizer import apply_physics_randomization
-                apply_physics_randomization(self._world, sample)
+                sample = self._domain_randomizer.last_sample() or {}
+                if sample:
+                    from src.utils.physics_randomizer import apply_physics_randomization
+                    apply_physics_randomization(self._world, sample)
             except Exception:  # noqa
                 pass
 
