@@ -43,7 +43,7 @@ Example line (abbreviated):
  
 - Counters (added):
   - `counters.deadline_miss`: 누적 deadline 초과 횟수 (action safe fallback 발생)
-  - `counters.rand_hash_mismatch`: 예상 hash 대비 불일치 발생 누적 (재현성 drift 감지)
+  - `counters.rand_hash_mismatch`: 예상 hash 대비 불일치 발생 누적 (재현성 drift 감지) — forensic 세부 항목은 `hash_mismatch_events.jsonl` 및 `scripts/analyze_hash_drift.py` 참고
   - `counters.deadline_miss_rate`: deadline_miss / total action count (비율, 0.0~1.0)
 
 ### 2.2 Recent Window Metrics

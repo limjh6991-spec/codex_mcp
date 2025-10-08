@@ -187,6 +187,8 @@ PY
 - SLA 알림(p95 latency, deadline_miss_rate) 이벤트 + cooldown
 - Prometheus textfile export (`gateway_metrics.prom`) for node exporter
 - CSV 라운드트립 측정 스크립트 (`measure_round_trip.py --csv`)
+ - 전송 레이턴시 벤치마킹 (`bench_transport.py --mode tcp --samples 2000 --csv bench.csv`)
+ - Hash mismatch forensic drift 분석 (`analyze_hash_drift.py --file logs/hash_mismatch_events.jsonl --csv drift.csv`)
 
 ## 스키마 파일
 `configs/schemas/obs_action_schema.json` 은 관측/액션 교환의 최소 계약을 정의합니다. 상위 `schema_version` 필드는 wire 호환성 관리에 사용됩니다.

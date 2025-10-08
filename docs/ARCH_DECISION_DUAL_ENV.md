@@ -96,15 +96,15 @@ SRE module mismatch 및 Isaac 번들 Python(3.11)과 시스템/프로젝트 Pyth
 ## 12. Status
 Accepted (2025-10-08).
 
-## 13. Forthcoming Enhancements (Planned)
-| 항목 | 설명 | 우선순위 |
-|------|------|----------|
-| Severity-tiered alerts | p95 / miss-rate WARN/CRIT 단계 | 높음 |
-| Prometheus labels | instance_id, policy_kind 라벨 추가 | 높음 |
-| Hash mismatch aggregate | rand_hash_mismatch 누적 counter 노출 | 중간 |
-| Transport benchmark script | TCP vs (향후) ZeroMQ/SHM 지연 측정 | 중간 |
-| Drift analysis tooling | forensic mismatch 로그 패턴 요약 | 중간 |
-| Auto transport escalate | 임계 초과 sustained 시 메시지 출력/권고 | 낮음 |
+| 13. Enhancement Status (Post-Adoption)|
+| 항목 | 설명 | 상태 | 비고 |
+|------|------|------|------|
+| Severity-tiered alerts | p95 / miss-rate WARN/CRIT 단계 | 완료 | 이벤트+Prometheus severity 지표 |
+| Prometheus labels | instance_id, policy_kind 라벨 | 완료 | 라벨 비활성화 옵션 지원 |
+| Hash mismatch aggregate | rand_hash_mismatch 누적 counter | 완료 | forensic JSONL + drift 분석 스크립트 |
+| Transport benchmark script | TCP 지연 측정 스크립트 | 완료 | `scripts/bench_transport.py` |
+| Drift analysis tooling | mismatch forensic 로그 패턴 요약 | 완료 | `scripts/analyze_hash_drift.py` |
+| Auto transport escalate | 임계 초과 sustained 시 메시지 출력/권고 | 대기 | p95 > 60ms 조건 충족 시 구현 |
 
 ---
 문서 개선 또는 상태 변경 시 업데이트 후 git commit 메시지: `docs: update dual env decision`.
