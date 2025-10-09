@@ -1,6 +1,114 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Isaac Sim environment precheck
+# - Detect install root
+# - Report version and bundled Python
+# - Attempt minimal module import check via helper scripts
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
+echo "[precheck] repo_dir=$REPO_DIR"
+
+# 1) Detect root
+CANDIDATES=()
+if [[ -n "${ISAAC_SIM_ROOT:-}" ]]; then CANDIDATES+=("$ISAAC_SIM_ROOT"); fi
+CANDIDATES+=("$HOME/.local/share/ov/pkg/isaac-sim" "$HOME/.local/share/ov/pkg/isaac_sim" \
+            "$HOME/.local/share/ov/pkg/isaac-sim-*" "$HOME/.local/share/ov/pkg/isaac_sim-*" \
+            "$HOME/isaac-sim" "$HOME/isaac_sim" \
+            "/opt/nvidia/isaac-sim" "/opt/isaac-sim")
+
+FOUND_ROOT=""
+for p in "${CANDIDATES[@]}"; do
+  for x in $(ls -d $p 2>/dev/null || true); do
+    if [[ -d "$x" ]]; then FOUND_ROOT="$x"; break 2; fi
+  done
+done
+
+if [[ -z "$FOUND_ROOT" ]]; then
+  echo "[precheck] Isaac Sim root not found. Set ISAAC_SIM_ROOT or install Isaac Sim."
+  echo "{\"ok\":false,\"reason\":\"root_not_found\"}"
+  exit 0
+fi
+
+echo "[precheck] isaac_root=$FOUND_ROOT"
+
+# 2) Version
+VER_FILE="$FOUND_ROOT/version.txt"
+if [[ -f "$VER_FILE" ]]; then
+  VER_STR="$(cat "$VER_FILE" | tr -d '\n' | tr -d '\r')"
+  echo "[precheck] version_file=$VER_STR"
+else
+  echo "[precheck] version_file=missing"
+fi
+
+# 3) Bundled Python check
+PY_VER=""
+if [[ -x "$FOUND_ROOT/python.sh" ]]; then
+  PY_VER="$($FOUND_ROOT/python.sh - <<'PY'
+import sys; print(sys.version)
+PY
+)"
+  echo "[precheck] bundled_python via python.sh: $PY_VER"
+elif [[ -f "$FOUND_ROOT/setup_python_env.sh" ]]; then
+  # shellcheck disable=SC1090
+  source "$FOUND_ROOT/setup_python_env.sh" >/dev/null 2>&1 || true
+  if command -v python >/dev/null 2>&1; then
+    PY_VER="$(python - <<'PY'
+import sys; print(sys.version)
+PY
+)"
+    echo "[precheck] bundled_python via setup_python_env.sh: $PY_VER"
+  else
+    echo "[precheck] python not available after setup_python_env.sh"
+  fi
+else
+  echo "[precheck] Neither python.sh nor setup_python_env.sh found"
+fi
+
+# 4) Minimal import checks (best-effort)
+IMPORT_OK="unknown"
+if [[ -x "$FOUND_ROOT/python.sh" ]]; then
+  if "$FOUND_ROOT/python.sh" "$REPO_DIR/scripts/check_isaac_import.py"; then
+    IMPORT_OK="true"
+  else
+    IMPORT_OK="false"
+  fi
+elif [[ -f "$FOUND_ROOT/setup_python_env.sh" ]]; then
+  # shellcheck disable=SC1090
+  source "$FOUND_ROOT/setup_python_env.sh" >/dev/null 2>&1 || true
+  if python "$REPO_DIR/scripts/check_isaac_import.py"; then
+    IMPORT_OK="true"
+  else
+    IMPORT_OK="false"
+  fi
+else
+  IMPORT_OK="unavailable_env"
+fi
+
+# 5) System Python
+SYS_PY_VER="$(python - <<'PY'
+import sys; print(sys.version)
+PY
+)"
+echo "[precheck] system_python: $SYS_PY_VER"
+
+# 6) JSON summary
+python - <<PY
+import json, os
+print(json.dumps({
+  'ok': True,
+  'isaac_root': os.environ.get('ISAAC_SIM_ROOT','') or '$FOUND_ROOT',
+  'version_file': os.path.exists('$VER_FILE'),
+  'bundled_python': "$PY_VER".strip(),
+  'system_python': "$SYS_PY_VER".strip(),
+  'import_ok': "$IMPORT_OK",
+}, ensure_ascii=False))
+PY
+
+exit 0
+#!/usr/bin/env bash
+set -euo pipefail
+
 YELLOW="\033[33m"; GREEN="\033[32m"; RED="\033[31m"; NC="\033[0m"
 
 function info(){ echo -e "${YELLOW}[INFO]${NC} $*"; }

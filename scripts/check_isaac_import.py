@@ -1,29 +1,44 @@
 #!/usr/bin/env python
-"""Isaac Sim Python API 임포트 진단 스크립트.
-ISAAC_SIM_PATH 환경 변수 또는 setup_python_env.sh를 통해 PYTHONPATH가 설정되어 있어야 한다.
+"""Isaac Sim Python API 임포트 진단 스크립트 (신/구 API 호환).
+우선순위:
+ 1) isaacsim.simulation_app (신 API)
+ 2) omni.isaac.kit (구 API, deprecated 경고 가능)
+ 3) omni.isaac.core (핵심 모듈)
+ISAAC_SIM_ROOT/python.sh 또는 setup_python_env.sh로 환경이 구성되어야 합니다.
 """
 from __future__ import annotations
-import os
 import sys
 import importlib
 
-REQUIRED = [
+results = []
+
+def try_import(mod: str) -> tuple[str, bool, str | None]:
+    try:
+        importlib.import_module(mod)
+        return mod, True, None
+    except Exception as e:  # noqa
+        return mod, False, str(e)
+
+checks = [
+    "isaacsim.simulation_app",
     "omni.isaac.kit",
     "omni.isaac.core",
 ]
 
-missing = []
-for mod in REQUIRED:
-    try:
-        importlib.import_module(mod)
-    except Exception as e:  # noqa
-        missing.append((mod, str(e)))
+ok = True
+for mod in checks:
+    name, success, err = try_import(mod)
+    results.append((name, success, err))
+    # Don't early-return; report all
+    if not success and name in ("omni.isaac.core",):
+        ok = False
 
-if missing:
-    print("[FAIL] Isaac Sim 모듈 임포트 실패:")
-    for mod, err in missing:
-        print(f" - {mod}: {err}")
-    print("환경 설정 가이드: source $ISAAC_SIM_PATH/setup_python_env.sh")
-    sys.exit(1)
+for name, success, err in results:
+    print(f"[{'OK' if success else 'FAIL'}] {name}{'' if success else f': {err}'}")
+
+if ok:
+    print("[OK] Isaac Sim 기본 임포트 점검 통과")
+    sys.exit(0)
 else:
-    print("[OK] Isaac Sim 핵심 모듈 임포트 성공")
+    print("[FAIL] Isaac Sim 핵심 모듈 일부 임포트 실패")
+    sys.exit(1)
