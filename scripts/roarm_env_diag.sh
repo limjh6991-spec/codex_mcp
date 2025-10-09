@@ -4,7 +4,7 @@
 set -euo pipefail
 
 TS=$(date +%F_%H-%M-%S)
-OUTDIR="logs/$(date +%F)"
+OUTDIR="log/$(date +%F)"
 mkdir -p "$OUTDIR"
 OUT="$OUTDIR/env_diag_${TS}.txt"
 
