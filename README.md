@@ -53,6 +53,22 @@ Stable-Baselines3 설치 후 GPU 사용을 위해서는 PyTorch CUDA 빌드가 �
 
 Isaac Sim Python API 연동은 NVIDIA Isaac Sim 설치 디렉토리의 `python.sh` 또는 `setup_python_env.sh` 스크립트를 이용해 PYTHONPATH를 주입해야 합니다.
 
+### 환경 빠른 점검 (필수)
+Isaac Sim 번들 Python(보통 3.11)과 시스템/venv Python(예: 3.12) 버전이 다르면 임포트 문제가 발생합니다. 아래 스크립트로 현재 상태를 점검하세요.
+
+```bash
+# Isaac 설치 루트를 자동 탐색하고, 번들 파이썬/시스템 파이썬/임포트 가능 여부를 요약 출력
+scripts/isaac_precheck.sh
+
+# 번들 환경 또는 setup_python_env.sh 로드 후 임포트 검사만 별도로 수행
+python scripts/check_isaac_import.py
+```
+
+결과 해석:
+- bundled_python: Isaac 번들 파이썬 버전 (예: 3.11.x)
+- system_python: 현재 셸의 파이썬 버전 (예: 3.12.x)
+- import_ok=false 이면, `omni.isaac.core` 등 핵심 모듈 임포트 실패이므로 `python.sh`로 스크립트를 실행하거나 `setup_python_env.sh`로 환경을 로드해야 합니다.
+
 ## VS Code 환경 구성 (자동화)
 프로젝트를 열면 `.vscode/` 하위 설정이 적용됩니다.
 
@@ -119,6 +135,10 @@ cp .env.example .env
 ```bash
 source /path/to/isaac-sim/setup_python_env.sh
 python scripts/check_isaac_import.py
+```
+또는 번들 파이썬으로 직접 실행:
+```bash
+/path/to/isaac-sim/python.sh scripts/check_isaac_import.py
 ```
 3. MCP 서버에서 Isaac 제어하려면: 로컬에서 Isaac GUI 띄운 뒤 WebSocket/RPC 브릿지 (추가 구현 예정)
 
