@@ -28,6 +28,22 @@
             "problemMatcher": []
         },
         {
+            "label": "Isaac Precheck",
+            "type": "shell",
+            "command": "./scripts/isaac_precheck.sh",
+            "problemMatcher": [
+                {
+                    "owner": "isaac-precheck",
+                    "pattern": {
+                        "regexp": "^\\{.*\\}$",
+                        "file": 1,
+                        "line": 1,
+                        "message": 0
+                    }
+                }
+            ]
+        },
+        {
             "label": "Run MCP Isaac Server",
             "type": "shell",
             "command": "python mcp_servers/isaac_controller_server.py",

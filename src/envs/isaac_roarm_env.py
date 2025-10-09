@@ -10,13 +10,32 @@ import numpy as np
 from .base_env import BaseSim2RealEnv
 from src.utils.isaac_joint_api import JointAPI  # type: ignore
 
+# Isaac 사용 가능성 감지 (신/구 API 모두 탐색)
 ISAAC_AVAILABLE = False
 try:  # pragma: no cover - CI나 일반 환경에서는 실패 가능
-    import omni.isaac.kit  # type: ignore
-    from omni.isaac.core import World  # type: ignore
-    ISAAC_AVAILABLE = True
+    import importlib
+    if importlib.util.find_spec("isaacsim.simulation_app") is not None:
+        ISAAC_AVAILABLE = True
+    elif importlib.util.find_spec("omni.isaac.kit") is not None:
+        ISAAC_AVAILABLE = True
 except Exception:  # noqa
     ISAAC_AVAILABLE = False
+
+_SIM_APP = None  # Lazy SimulationApp (isaacsim.simulation_app)
+
+def _ensure_sim_app(headless: bool = False):  # pragma: no cover
+    global _SIM_APP
+    if _SIM_APP is not None:
+        return _SIM_APP
+    try:
+        import importlib
+        sim_mod = importlib.import_module("isaacsim.simulation_app")
+        SimulationApp = getattr(sim_mod, "SimulationApp")
+        _SIM_APP = SimulationApp({"headless": bool(headless)})
+        return _SIM_APP
+    except Exception:
+        # 구 API 경로 (omni.isaac.kit) 초기화는 상위 레이어에서 담당하거나 생략
+        return None
 
 class IsaacRoArmM3Env(BaseSim2RealEnv):
     ACTION_DIM = 6  # Placeholder (실제 로봇 관절 수에 맞게 조정)
@@ -29,6 +48,13 @@ class IsaacRoArmM3Env(BaseSim2RealEnv):
         super().__init__(domain_randomizer)
         self._stage_path = stage_path
         self._joint_config = joint_config
+        # 시뮬레이션 앱 초기화 시도 (신 API 우선)
+        _ensure_sim_app(headless=headless)
+        # World 동적 import (초기화 이후 시도)
+        try:
+            from omni.isaac.core import World  # type: ignore
+        except Exception as e:  # noqa
+            raise RuntimeError(f"Isaac World import 실패: {type(e).__name__}: {e}")
         self._world = World(stage_units_in_meters=1.0)
         self._joint_api = JointAPI(articulation=None)
         self._articulation_prim = articulation_prim or "/World/roarm"
@@ -99,6 +125,23 @@ class IsaacRoArmM3Env(BaseSim2RealEnv):
             if self._joint_api._articulation is None:
                 # one more attach attempt after warm-up
                 self._joint_api.attach(self._articulation_prim, world=self._world, tries=1)
+        # Joint map 검증: joint_config.joints 와 실제 articulation joints 비교 (가능 시)
+        try:
+            cfg_names = list(self._joint_config.get("joints", [])) if isinstance(self._joint_config, dict) else []
+            actual = self._joint_api.list_joints()
+            if cfg_names and actual:
+                # 단순 비교: 길이/집합
+                if len(cfg_names) != len(actual) or set(cfg_names) != set(actual):
+                    import logging, json as _json
+                    logging.getLogger(__name__).warning(_json.dumps({
+                        "event": "joint_map_mismatch",
+                        "cfg_count": len(cfg_names),
+                        "actual_count": len(actual),
+                        "cfg_only": [n for n in cfg_names if n not in actual],
+                        "actual_only": [n for n in actual if n not in cfg_names],
+                    }))
+        except Exception:  # noqa
+            pass
         self.apply_domain_randomization()
         obs = self._get_obs()
         info = {"stage": self._stage_path, "articulation_attached": bool(getattr(self._joint_api, '_articulation', None))}
