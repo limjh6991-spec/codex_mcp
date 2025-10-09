@@ -20,13 +20,19 @@ Purpose: Track latency & throughput metrics before introducing alternative trans
 | Recent window p95 | < 50ms | Early detection of regression |
 | deadline_miss_rate | < 0.02 | Maintain control stability |
 
-## Placeholder Baseline (to be filled after real run)
-| Scenario | Samples | p50 | p90 | p95 | p99 | Notes |
-|----------|---------|-----|-----|-----|-----|-------|
-| gateway_idle_dummy_policy | TBD | - | - | - | - | Dummy linear policy, no Isaac step |
-| gateway_sb3_loaded | TBD | - | - | - | - | PPO zip loaded |
-| future_isacc_loop_10hz | TBD | - | - | - | - | With articulation update |
-| future_isacc_loop_30hz | TBD | - | - | - | - | With articulation update |
+## Automated Baseline (Latest synthetic run)
+아래 표는 `scripts/generate_perf_baseline.py` 실행 결과( dummy_zero 정책, 관절만 증가 )를 기록합니다.
+
+| policy_kind | q_dim | iters | mean_ms | p95_ms | p99_ms | std_ms | max_ms | timestamp |
+|-------------|------|-------|--------|--------|--------|--------|--------|-----------|
+| dummy_zero | 12 | 120 | 2.072 | 2.456 | 2.622 | 0.274 | 3.264 | 1759905545 |
+| dummy_zero | 48 | 120 | 1.970 | 2.101 | 2.245 | 0.086 | 2.562 | 1759905545 |
+
+### How to Refresh
+```
+python scripts/generate_perf_baseline.py --q-dims 12,48 --iters 300 --markdown > /tmp/perf.json
+```
+JSON 파일은 `logs/perf_baseline_run_<ts>.json` 에 저장되며, Markdown 테이블을 위 섹션으로 복사 반영합니다.
 
 ## Data Collection Procedure
 1. Start gateway: `python scripts/ipc_policy_gateway.py --metrics-interval 5 --prometheus-textfile logs/gateway_metrics.prom`
@@ -41,3 +47,4 @@ Purpose: Track latency & throughput metrics before introducing alternative trans
 
 ## Revision Log
 - 2025-10-08: Initial scaffold created (no empirical values yet).
+- 2025-10-08: Added first synthetic baseline (commit: <hash_pending>)

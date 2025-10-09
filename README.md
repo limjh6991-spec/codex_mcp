@@ -53,6 +53,10 @@ Stable-Baselines3 설치 후 GPU 사용을 위해서는 PyTorch CUDA 빌드가 �
 
 Isaac Sim Python API 연동은 NVIDIA Isaac Sim 설치 디렉토리의 `python.sh` 또는 `setup_python_env.sh` 스크립트를 이용해 PYTHONPATH를 주입해야 합니다.
 
+주의:
+- View RoArm/Isaac 관련 스크립트를 실행하려면 `ISAAC_SIM_ROOT` 환경변수와 해당 경로 하위의 `python.sh`가 필요합니다. (예: `/home/user/isaac_sim/python.sh`)
+- 환경 진단 결과에서 `omni.isaac.core` 임포트 실패가 보이면, 반드시 Isaac 번들 파이썬(`python.sh`)으로 실행하세요.
+
 ### 환경 빠른 점검 (필수)
 Isaac Sim 번들 Python(보통 3.11)과 시스템/venv Python(예: 3.12) 버전이 다르면 임포트 문제가 발생합니다. 아래 스크립트로 현재 상태를 점검하세요.
 
@@ -73,7 +77,7 @@ python scripts/check_isaac_import.py
 프로젝트를 열면 `.vscode/` 하위 설정이 적용됩니다.
 
 - `settings.json`: 인터프리터, PYTHONUNBUFFERED, MCP 서버(isaac) 선언
-- `tasks.json`: 의존성 설치 / 테스트 / 학습 / Isaac 임포트 체크 / MCP 서버 실행
+- `tasks.json`: 의존성 설치 / 테스트 / 학습 / Isaac 임포트 체크 / 환경 진단 / MCP 서버 실행 / RoArm USD 뷰어
 - `launch.json`: PPO 학습 디버그, Isaac MCP 서버 디버그
 - `extensions.json`: 권장 확장 (Python, Copilot Chat, YAML 등)
 
@@ -81,6 +85,8 @@ python scripts/check_isaac_import.py
 ```bash
 code .  # VS Code로 폴더 오픈 후
 # 명령 팔레트 (Ctrl+Shift+P) → Tasks: Run Task → Train PPO (quick)
+# 명령 팔레트 → Tasks: Run Task → Env Diagnostic  (환경/버전/Isaac precheck 결과를 logs/YYYY-MM-DD/env_diag_*.txt 로 저장)
+# 명령 팔레트 → Tasks: Run Task → View RoArm (USD)  (ISAAC_SIM_ROOT 설정 + python.sh 필요, 프롬프트에 USD 경로 입력)
 ```
 
 ## MCP 서버 사용

@@ -5,7 +5,9 @@ The format roughly follows Keep a Changelog (dates in YYYY-MM-DD) and semantic g
 
 ## [Unreleased]
 ### Added
-- (placeholder)
+- Joint limit enforcement in gateway (delta clipping via `--joint-spec`); action flags: `joint_limit_clipped`, `clipped_joint_indices`; metrics counter `joint_limit_violation`
+- Joint spec mismatch detection (flags: `joint_spec_mismatch`, `expected_dof`, `observed_dof`; counter: `joint_spec_mismatch`; advisory event with cooldown)
+- Consecutive deadline miss escalation (CLI: `--deadline-escalate-threshold`, `--degrade-mode-ratio`; counters: `deadline_escalation_events`, `consec_deadline_miss`; advisory event `deadline_escalation`)
 ### Changed
 - (placeholder)
 ### Removed

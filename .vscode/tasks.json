@@ -1,5 +1,5 @@
 {
-    "$schema": "https://raw.githubusercontent.com/microsoft/vscode/main/extensions/configuration-editing/schemas/vscode-tasks-schema.json",
+    "$schema": "vscode://schemas/tasks",
     "version": "2.0.0",
     "tasks": [
         {
@@ -44,10 +44,40 @@
             ]
         },
         {
+            "label": "Env Diagnostic",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-lc",
+                "scripts/roarm_env_diag.sh"
+            ],
+            "problemMatcher": [],
+            "group": "none"
+        },
+        {
+            "label": "View RoArm (USD)",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-lc",
+                "${env:ISAAC_SIM_ROOT}/python.sh scripts/view_roarm.py --usd '${input:usdPath}' --steps 300"
+            ],
+            "problemMatcher": [],
+            "group": "none"
+        },
+        {
             "label": "Run MCP Isaac Server",
             "type": "shell",
             "command": "python mcp_servers/isaac_controller_server.py",
             "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "usdPath",
+            "type": "promptString",
+            "description": "Path to robot USD file",
+            "default": "${workspaceFolder}/assets/roarm.usd"
         }
     ]
 }

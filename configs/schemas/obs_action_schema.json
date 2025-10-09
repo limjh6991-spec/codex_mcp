@@ -34,8 +34,13 @@
                     "type": "integer"
                 },
                 "joint_names": {
-                    "type": ["array", "null"],
-                    "items": {"type": "string"},
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
                     "description": "Optional ordered joint name list matching q/dq arrays; provided after real robot spec integration."
                 },
                 "q": {
@@ -81,7 +86,10 @@
                     }
                 },
                 "action_scale_hint": {
-                    "type": ["number", "null"],
+                    "type": [
+                        "number",
+                        "null"
+                    ],
                     "description": "Optional scale applied to raw policy output prior to clipping; informs downstream normalization."
                 },
                 "raw_policy": {

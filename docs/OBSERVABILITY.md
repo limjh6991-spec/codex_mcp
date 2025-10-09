@@ -45,7 +45,10 @@ Example line (abbreviated):
   - `counters.deadline_miss`: 누적 deadline 초과 횟수 (action safe fallback 발생)
   - `counters.rand_hash_mismatch`: 예상 hash 대비 불일치 발생 누적 (재현성 drift 감지) — forensic 세부 항목은 `hash_mismatch_events.jsonl` 및 `scripts/analyze_hash_drift.py` 참고
   - `counters.deadline_miss_rate`: deadline_miss / total action count (비율, 0.0~1.0)
-  - `counters.joint_limit_violation`: (stub) 조인트 한계 초과 감지 카운터(Isaac articulation 통합 시 활성화 예정)
+  - `counters.joint_limit_violation`: 조인트 한계 클리핑 발생 누적 (q+delta 가 lower/upper 범위 초과하여 delta 조정된 횟수; 다중 joint 클리핑 시 joint 단위로 가산)
+  - `counters.joint_spec_mismatch`: 관측된 q 길이와 로드된 joint_spec 길이 불일치 발생 누적 (cooldown 30s마다 advisory 이벤트 1회)
+  - `counters.deadline_escalation_events`: 연속 deadline miss 임계 도달로 발생한 escalation advisory 누적
+  - `counters.consec_deadline_miss`: 현재 연속 deadline miss 횟수 (성공 처리 시 0으로 리셋)
 
 ### 2.2 Recent Window Metrics
 `recent_latency_ms` 섹션: 마지막 최대 200개 샘플에 대한 p50/p90/p95/p99 추이(단기 편차 관찰용).
@@ -74,6 +77,10 @@ python scripts/measure_round_trip.py --iters 200 --q-dim 12 --csv out.csv
 - Observability/Debugging:
   - `deadline_miss` flag surfaces in action payload and event log `resp`
   - Latency is still recorded for statistical tracking
+  - Escalation 추가 기능:
+    - CLI: `--deadline-escalate-threshold N` 설정 시 연속 N회 miss 도달 시 `deadline_escalation` advisory 이벤트 기록
+    - 옵션 degrade 모드: `--degrade-mode-ratio R` (0<R<=1) 설정 시 escalation 이후 확률 R 로 delta를 0으로 치환하여 시스템 부하 완화
+    - 관련 카운터: `deadline_escalation_events`, `consec_deadline_miss`
 
 ## 4. Randomization Hash Echo
 - Purpose: reproducibility and detection of unintended simulation parameter drift
@@ -159,7 +166,12 @@ Change log:
 | p95 latency | 60ms | 3+ flush | 직렬화/네트워크 프로파일, ZeroMQ/SHM 검토 (자동 advisory 가능: `--auto-transport-escalate-p95`) |
 | deadline_miss_rate | 0.02 | 2+ flush | 관측 벡터 축소, 정책 경량화 |
 | hash mismatch | >5 / min | 즉시 | seed 재확인, 랜덤화 구성 diff |
-| joint_limit_violation | TBD | 1+ (중요) | 관절 한계/스케일 조정, action scaling 재평가 |
+| joint_limit_violation | 즉시 | 1+ (중요) | 관절 한계/스케일 조정, action scaling 재평가 |
+| joint_spec_mismatch | 즉시 | 1+ (중요) | 관측/모델/사양 동기화, 파이프라인 재빌드 |
+| deadline_escalation | 즉시 | threshold 도달 | degrade 모드 진입 평가, 모델 경량화 |
 
 ---
 - v2: recent window metrics, deadline_miss_rate, log rotation, gzip, Prometheus export, SLA alerts, hash mismatch forensic log.
+- v3: joint limit enforcement (delta 클리핑, joint_limit_violation 카운터, action flags: joint_limit_clipped, clipped_joint_indices)
+- v4: joint spec mismatch 감지 (action flags: joint_spec_mismatch, expected_dof, observed_dof; counter: joint_spec_mismatch)
+- v5: 연속 deadline miss escalation (CLI: --deadline-escalate-threshold, --degrade-mode-ratio; counters: deadline_escalation_events, consec_deadline_miss)
