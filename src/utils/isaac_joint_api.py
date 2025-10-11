@@ -109,6 +109,12 @@ class JointAPI:
                                 _Art = _g.get("_Art")
                                 if _Art is not None:
                                     view = _Art(prim_path=attach_path, name=f"roarm_art_{attach_path.split('/')[-1]}")
+                                    # Some builds need explicit initialize
+                                    if hasattr(view, "initialize"):
+                                        try:
+                                            view.initialize()
+                                        except Exception:
+                                            pass
                                     break
                             except Exception as e:  # noqa
                                 import_error_msgs.append(f"{imp} -> {e}")
@@ -164,6 +170,11 @@ class JointAPI:
                                             _Art = _g.get("_Art")
                                             if _Art is not None:
                                                 view = _Art(prim_path=prim_path, name=f"roarm_art_{prim_path.split('/')[-1]}_late")
+                                                if hasattr(view, "initialize"):
+                                                    try:
+                                                        view.initialize()
+                                                    except Exception:
+                                                        pass
                                                 break
                                         except Exception:
                                             continue
@@ -199,6 +210,15 @@ class JointAPI:
                         dof_count = int(val() if callable(val) else val)
                         break
                 if dof_count is None:
+                    for meth in ("get_dof_count",):
+                        fn = getattr(self._articulation, meth, None)
+                        if callable(fn):
+                            try:
+                                dof_count = int(fn())
+                                break
+                            except Exception:
+                                pass
+                if dof_count is None:
                     gdn = getattr(self._articulation, "get_dof_names", None)
                     if callable(gdn):
                         try:
@@ -223,7 +243,7 @@ class JointAPI:
     def is_attached(self) -> bool:
         return self._prim_path is not None
 
-    def list_joints(self) -> List[str]:
+    def list_joints(self, only_movable: bool = True) -> List[str]:
         """Return list of joint names.
 
         Isaac 사용 가능 & articulation 확보된 경우 실제 joint name 목록 반환.
@@ -240,7 +260,10 @@ class JointAPI:
                 if callable(fn):
                     try:
                         names = fn()
-                        return list(names)
+                        names_list = list(names)
+                        if names_list:
+                            # 대부분의 API는 movable DOF만 반환
+                            return names_list
                     except Exception:
                         pass
             # 2) Legacy: get_joints() returning objects with name or get_name
@@ -261,9 +284,165 @@ class JointAPI:
                         return names
                 except Exception:
                     pass
+            # 3) Fallback: scan USD stage under prim for physics joints
+            try:
+                from omni.usd import get_context  # type: ignore
+                ctx = get_context()
+                stage = ctx.get_stage() if ctx else None
+                if stage is not None and self._prim_path:
+                    prim_path = str(self._prim_path)
+                    try:
+                        from pxr import UsdPhysics  # type: ignore
+                    except Exception:
+                        UsdPhysics = None  # type: ignore
+                    joint_names: List[str] = []
+                    if UsdPhysics is not None:
+                        def is_joint(p):
+                            try:
+                                for cls_name in ("RevoluteJoint", "PrismaticJoint", "SphericalJoint", "DistanceJoint", "FixedJoint"):
+                                    cls = getattr(UsdPhysics, cls_name, None)
+                                    if cls and p.IsA(cls):
+                                        return True
+                            except Exception:
+                                return False
+                            return False
+                        it = stage.Traverse()
+                        for p in it:
+                            path_str = p.GetPath().pathString
+                            if not path_str.startswith(prim_path + "/"):
+                                continue
+                            if is_joint(p):
+                                # movable 필터: Revolute/Prismatic만 포함
+                                if only_movable:
+                                    try:
+                                        if p.IsA(getattr(UsdPhysics, "RevoluteJoint", None)) or p.IsA(getattr(UsdPhysics, "PrismaticJoint", None)):
+                                            joint_names.append(path_str.split("/")[-1])
+                                    except Exception:
+                                        # 타입 확인 실패 시 일단 추가
+                                        joint_names.append(path_str.split("/")[-1])
+                                else:
+                                    joint_names.append(path_str.split("/")[-1])
+                    if joint_names:
+                        return joint_names
+            except Exception:
+                pass
         except Exception:
             return []
         return []
+
+    # --- USD Traversal Helpers ---
+    def _scan_usd_joints(self) -> List[Dict[str, Any]]:
+        """Scan USD under the articulation prim and collect joint infos.
+
+        Returns list of dicts: {name, path, type, lower, upper}
+        """
+        infos: List[Dict[str, Any]] = []
+        try:  # pragma: no cover - Isaac environment required
+            from omni.usd import get_context  # type: ignore
+            from pxr import UsdPhysics  # type: ignore
+            ctx = get_context()
+            stage = ctx.get_stage() if ctx else None
+            if stage is None or not self._prim_path:
+                return infos
+            root = str(self._prim_path)
+            it = stage.Traverse()
+            for p in it:
+                path_str = p.GetPath().pathString
+                if not path_str.startswith(root + "/"):
+                    continue
+                jtype = None
+                if p.IsA(getattr(UsdPhysics, "RevoluteJoint", None)):
+                    jtype = "revolute"
+                elif p.IsA(getattr(UsdPhysics, "PrismaticJoint", None)):
+                    jtype = "prismatic"
+                elif p.IsA(getattr(UsdPhysics, "FixedJoint", None)):
+                    jtype = "fixed"
+                elif p.IsA(getattr(UsdPhysics, "SphericalJoint", None)):
+                    jtype = "spherical"
+                elif p.IsA(getattr(UsdPhysics, "DistanceJoint", None)):
+                    jtype = "distance"
+                else:
+                    continue
+                name = path_str.split("/")[-1]
+                lower = None
+                upper = None
+                try:
+                    # Try strongly-typed accessors if available
+                    if jtype == "revolute":
+                        api = UsdPhysics.RevoluteJoint.Get(stage, p.GetPath())
+                        if api:
+                            try:
+                                lower = api.GetLowerLimitAttr().Get()
+                                upper = api.GetUpperLimitAttr().Get()
+                            except Exception:
+                                pass
+                    elif jtype == "prismatic":
+                        api = UsdPhysics.PrismaticJoint.Get(stage, p.GetPath())
+                        if api:
+                            try:
+                                lower = api.GetLowerLimitAttr().Get()
+                                upper = api.GetUpperLimitAttr().Get()
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+                infos.append({
+                    "name": name,
+                    "path": path_str,
+                    "type": jtype,
+                    "lower": lower,
+                    "upper": upper,
+                })
+        except Exception:
+            return infos
+        return infos
+
+    def get_joint_limits_by_name(self, only_movable: bool = True) -> Dict[str, Any]:
+        """Return joint limits from USD, keyed by joint name.
+
+        For movable joints (revolute/prismatic), returns dict name -> {lower, upper}.
+        Values may be None if not specified in USD.
+        """
+        result: Dict[str, Any] = {}
+        infos = self._scan_usd_joints()
+        for info in infos:
+            if only_movable and info.get("type") not in ("revolute", "prismatic"):
+                continue
+            nm = str(info.get("name"))
+            result[nm] = {"lower": info.get("lower"), "upper": info.get("upper")}
+        return result
+
+    def get_dof_limits(self, normalize_revolute_to_radians: bool = True) -> Dict[str, Any]:
+        """Return lower/upper lists aligned to list_joints(only_movable=True).
+
+        If normalize_revolute_to_radians is True, attempt to detect degree-authored
+        revolute limits and convert to radians.
+        """
+        import math
+        names = self.list_joints(only_movable=True)
+        lims = self.get_joint_limits_by_name(only_movable=True)
+        # also collect joint types for conversion logic
+        type_map: Dict[str, str] = {info.get("name"): info.get("type") for info in self._scan_usd_joints()}
+        lower: List[Optional[float]] = []
+        upper: List[Optional[float]] = []
+        converted_any = False
+        for nm in names:
+            li = lims.get(nm, {})
+            lo = li.get("lower")
+            hi = li.get("upper")
+            jtype = type_map.get(nm)
+            if normalize_revolute_to_radians and jtype == "revolute" and lo is not None and hi is not None:
+                # Heuristic: if any bound exceeds ~pi*1.2 assume degrees
+                try:
+                    if abs(float(lo)) > math.pi * 1.2 or abs(float(hi)) > math.pi * 1.2:
+                        lo = math.radians(float(lo))
+                        hi = math.radians(float(hi))
+                        converted_any = True
+                except Exception:
+                    pass
+            lower.append(lo)
+            upper.append(hi)
+        return {"names": names, "lower": lower, "upper": upper, "types": [type_map.get(n) for n in names], "converted": converted_any}
 
     def get_state(self) -> Dict[str, Any]:
         """Fetch joint state (positions & velocities).

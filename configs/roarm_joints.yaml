@@ -1,16 +1,20 @@
-# RoArm M3 Joint Mapping (Placeholder)
-# 실제 USD/URDF 확인 후 joint 이름 업데이트 필요
+# RoArm M3 Joint Mapping (Updated from USD discovery)
+# USD articulation movable joints detected under /roarm_m3:
+#   ['base_link_to_link1', 'link1_to_link2', 'link2_to_link3', 'link3_to_link4', 'link4_to_link5', 'link5_to_gripper_link']
+# NOTE: USD joint limits are likely authored in degrees for revolute joints. Isaac runtime DOF positions are radians.
+#       If you use these limits for clamping, convert degrees -> radians first.
 joints:
-  - base_rotate
-  - shoulder_lift
-  - elbow_flex
-  - wrist_pitch
-  - wrist_roll
-  - gripper
+  - base_link_to_link1
+  - link1_to_link2
+  - link2_to_link3
+  - link3_to_link4
+  - link4_to_link5
+  - link5_to_gripper_link
+# Optional: place limits here in radians after confirming in-sim. Example placeholders below.
 limits:
-  base_rotate: [-3.14, 3.14]
-  shoulder_lift: [-1.57, 1.57]
-  elbow_flex: [-1.57, 1.57]
-  wrist_pitch: [-1.57, 1.57]
-  wrist_roll: [-3.14, 3.14]
-  gripper: [0.0, 0.04]
+  base_link_to_link1: [-3.1416, 3.1416]
+  link1_to_link2: [-1.5708, 1.5708]
+  link2_to_link3: [-1.0, 2.95]
+  link3_to_link4: [-1.5708, 1.5708]
+  link4_to_link5: [-3.1416, 3.1416]
+  link5_to_gripper_link: [0.0, 1.50]

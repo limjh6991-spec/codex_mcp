@@ -21,4 +21,14 @@ source "$VENV_DIR/bin/activate"
 
 ACTIVATE_ISAACSIM_QUIET=1 source "$SCRIPT_DIR/activate_isaacsim_env.sh" "$VENV_DIR"
 
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+if [[ -z "${PYTHONPATH:-}" ]]; then
+  export PYTHONPATH="$PROJECT_ROOT"
+else
+  case ":$PYTHONPATH:" in
+    *":$PROJECT_ROOT:"*) ;;
+    *) export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH" ;;
+  esac
+fi
+
 exec python "$@"

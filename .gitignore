@@ -40,3 +40,11 @@ artifacts/
 
 # Misc
 .DS_Store
+
+# Isaac Sim generated artifacts
+assets/roarm_m3/usd/*
+!assets/roarm_m3/usd/README.md
+assets/roarm_m3/urdf/roarm_m3.generated.urdf
+assets/roarm_m3/urdf/roarm_m3.generated/
+assets/roarm_m3/urdf/roarm_m3/*
+!assets/roarm_m3/urdf/roarm_m3/README.md

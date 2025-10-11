@@ -20,6 +20,7 @@ def main():
     parser = argparse.ArgumentParser(description="Apply Articulation Root API to a prim in USD")
     parser.add_argument("--usd", required=True, help="Path to USD file")
     parser.add_argument("--prim", required=True, help="Prim path, e.g., /World/roarm_m3")
+    parser.add_argument("--remove-nested", default=None, help="Optional nested prim to remove existing articulation root APIs from (to avoid nested articulation roots)")
     args = parser.parse_args()
 
     usd_path = args.usd
@@ -73,6 +74,34 @@ def main():
         return 5
 
     applied_any = False
+
+    # Optionally remove nested API first to avoid nested articulation roots
+    if args.remove_nested:
+        nested_path = args.remove_nested
+        nprim = stage.GetPrimAtPath(nested_path)
+        if nprim and nprim.IsValid():
+            removed = False
+            if UsdPhysics is not None:
+                try:
+                    # In USD, removal is done via prim.RemoveAPI(SchemaClass)
+                    if nprim.HasAPI(UsdPhysics.ArticulationRootAPI):
+                        nprim.RemoveAPI(UsdPhysics.ArticulationRootAPI)
+                        removed = True
+                        print(f"[apply] Removed UsdPhysics.ArticulationRootAPI from {nested_path}")
+                except Exception as e:
+                    print(f"[apply] WARN: Could not remove UsdPhysics.ArticulationRootAPI from {nested_path}: {e}")
+            if PhysxSchema is not None and hasattr(PhysxSchema, "PhysxArticulationRootAPI"):
+                try:
+                    if nprim.HasAPI(PhysxSchema.PhysxArticulationRootAPI):
+                        nprim.RemoveAPI(PhysxSchema.PhysxArticulationRootAPI)
+                        removed = True
+                        print(f"[apply] Removed PhysxSchema.PhysxArticulationRootAPI from {nested_path}")
+                except Exception as e:
+                    print(f"[apply] WARN: Could not remove PhysxSchema.PhysxArticulationRootAPI from {nested_path}: {e}")
+            if removed:
+                applied_any = True
+        else:
+            print(f"[apply] INFO: remove-nested prim not found or invalid: {nested_path}")
 
     # Apply UsdPhysics articulation root API if available
     if UsdPhysics is not None:
