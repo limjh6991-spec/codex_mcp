@@ -9,80 +9,97 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
 echo "[precheck] repo_dir=$REPO_DIR"
 
-# 1) Detect root
-CANDIDATES=()
-if [[ -n "${ISAAC_SIM_ROOT:-}" ]]; then CANDIDATES+=("$ISAAC_SIM_ROOT"); fi
-CANDIDATES+=("$HOME/.local/share/ov/pkg/isaac-sim" "$HOME/.local/share/ov/pkg/isaac_sim" \
-            "$HOME/.local/share/ov/pkg/isaac-sim-*" "$HOME/.local/share/ov/pkg/isaac_sim-*" \
-            "$HOME/isaac-sim" "$HOME/isaac_sim" \
-            "/opt/nvidia/isaac-sim" "/opt/isaac-sim")
-
+# 1) Detect environment
+VENV_DIR="${ISAACSIM_VENV:-$HOME/isaacsim-venv}"
 FOUND_ROOT=""
-for p in "${CANDIDATES[@]}"; do
-  for x in $(ls -d $p 2>/dev/null || true); do
-    if [[ -d "$x" ]]; then FOUND_ROOT="$x"; break 2; fi
+VENV_PY=""
+PX_IMPORT="unknown"
+IMPORT_OK="unknown"
+
+if [[ -d "$VENV_DIR" && -f "$VENV_DIR/bin/activate" ]]; then
+  echo "[precheck] isaacsim_venv=$VENV_DIR"
+  if source "$VENV_DIR/bin/activate"; then
+    if ACTIVATE_ISAACSIM_QUIET=1 source "$REPO_DIR/scripts/activate_isaacsim_env.sh" "$VENV_DIR"; then
+      FOUND_ROOT="${ISAACSIM_ROOT:-}"
+      if [[ -n "$FOUND_ROOT" ]]; then
+        VENV_PY="$(python - <<'PY'
+import sys
+print(sys.version.replace('\n',' '))
+PY
+)"
+        PX_IMPORT="$(python - <<'PY'
+try:
+    from pxr import Usd  # noqa: F401
+    print('true')
+except Exception as exc:  # noqa: BLE001
+    print(f"false:{exc}")
+PY
+)"
+        if python "$REPO_DIR/scripts/check_isaac_import.py" >/dev/null 2>&1; then
+          IMPORT_OK="true"
+        else
+          IMPORT_OK="false"
+        fi
+      fi
+    else
+      echo "[precheck] activate_isaacsim_env.sh failed"
+    fi
+  fi
+fi
+
+# Legacy fallback (ZIP install)
+if [[ -z "$FOUND_ROOT" ]]; then
+  CANDIDATES=()
+  if [[ -n "${ISAAC_SIM_ROOT:-}" ]]; then CANDIDATES+=("$ISAAC_SIM_ROOT"); fi
+  CANDIDATES+=("$HOME/.local/share/ov/pkg/isaac-sim" "$HOME/.local/share/ov/pkg/isaac_sim" \
+              "$HOME/.local/share/ov/pkg/isaac-sim-*" "$HOME/.local/share/ov/pkg/isaac_sim-*" \
+              "$HOME/isaac-sim" "$HOME/isaac_sim" \
+              "/opt/nvidia/isaac-sim" "/opt/isaac-sim")
+
+  for p in "${CANDIDATES[@]}"; do
+    for x in $(ls -d $p 2>/dev/null || true); do
+      if [[ -d "$x" ]]; then FOUND_ROOT="$x"; break 2; fi
+    done
   done
-done
+
+  if [[ -n "$FOUND_ROOT" ]]; then
+    echo "[precheck] legacy_root=$FOUND_ROOT"
+    if [[ -x "$FOUND_ROOT/python.sh" ]]; then
+      VENV_PY="$($FOUND_ROOT/python.sh - <<'PY'
+import sys; print(sys.version)
+PY
+)"
+      if "$FOUND_ROOT/python.sh" "$REPO_DIR/scripts/check_isaac_import.py" >/dev/null 2>&1; then
+        IMPORT_OK="true"
+      else
+        IMPORT_OK="false"
+      fi
+    fi
+  fi
+fi
 
 if [[ -z "$FOUND_ROOT" ]]; then
-  echo "[precheck] Isaac Sim root not found. Set ISAAC_SIM_ROOT or install Isaac Sim."
+  echo "[precheck] Isaac Sim environment not detected. Set ISAACSIM_VENV or install Isaac Sim."
   echo "{\"ok\":false,\"reason\":\"root_not_found\"}"
   exit 0
 fi
 
 echo "[precheck] isaac_root=$FOUND_ROOT"
 
-# 2) Version
-VER_FILE="$FOUND_ROOT/version.txt"
-if [[ -f "$VER_FILE" ]]; then
-  VER_STR="$(cat "$VER_FILE" | tr -d '\n' | tr -d '\r')"
+# 2) Version file lookup
+VER_FILE=""
+for candidate in "$FOUND_ROOT/version.txt" "$FOUND_ROOT/VERSION"; do
+  if [[ -f "$candidate" ]]; then
+    VER_FILE="$candidate"
+    break
+  fi
+done
+
+if [[ -n "$VER_FILE" ]]; then
+  VER_STR="$(cat "$VER_FILE" | tr -d '\n\r')"
   echo "[precheck] version_file=$VER_STR"
 else
   echo "[precheck] version_file=missing"
-fi
-
-# 3) Bundled Python check
-PY_VER=""
-if [[ -x "$FOUND_ROOT/python.sh" ]]; then
-  PY_VER="$($FOUND_ROOT/python.sh - <<'PY'
-import sys; print(sys.version)
-PY
-)"
-  echo "[precheck] bundled_python via python.sh: $PY_VER"
-elif [[ -f "$FOUND_ROOT/setup_python_env.sh" ]]; then
-  # shellcheck disable=SC1090
-  source "$FOUND_ROOT/setup_python_env.sh" >/dev/null 2>&1 || true
-  if command -v python >/dev/null 2>&1; then
-    PY_VER="$(python - <<'PY'
-import sys; print(sys.version)
-PY
-)"
-    echo "[precheck] bundled_python via setup_python_env.sh: $PY_VER"
-  else
-    echo "[precheck] python not available after setup_python_env.sh"
-  fi
-else
-  echo "[precheck] Neither python.sh nor setup_python_env.sh found"
-fi
-
-# 4) Minimal import checks (best-effort)
-IMPORT_OK="unknown"
-if [[ -x "$FOUND_ROOT/python.sh" ]]; then
-  if "$FOUND_ROOT/python.sh" "$REPO_DIR/scripts/check_isaac_import.py"; then
-    IMPORT_OK="true"
-  else
-    IMPORT_OK="false"
-  fi
-elif [[ -f "$FOUND_ROOT/setup_python_env.sh" ]]; then
-  # shellcheck disable=SC1090
-  source "$FOUND_ROOT/setup_python_env.sh" >/dev/null 2>&1 || true
-  if python "$REPO_DIR/scripts/check_isaac_import.py"; then
-    IMPORT_OK="true"
-  else
-    IMPORT_OK="false"
-  fi
-else
-  IMPORT_OK="unavailable_env"
 fi
 
 # 5) System Python
@@ -98,9 +115,10 @@ import json, os
 print(json.dumps({
   'ok': True,
   'isaac_root': os.environ.get('ISAAC_SIM_ROOT','') or '$FOUND_ROOT',
-  'version_file': os.path.exists('$VER_FILE'),
-  'bundled_python': "$PY_VER".strip(),
+  'version_file': bool('$VER_FILE'),
+  'venv_python': "$VENV_PY".strip(),
   'system_python': "$SYS_PY_VER".strip(),
+  'pxr_import': "$PX_IMPORT".strip(),
   'import_ok': "$IMPORT_OK",
 }, ensure_ascii=False))
 PY

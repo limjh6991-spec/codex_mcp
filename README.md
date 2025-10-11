@@ -51,27 +51,40 @@ pip install -e .
 
 Stable-Baselines3 설치 후 GPU 사용을 위해서는 PyTorch CUDA 빌드가 필요합니다. (PyPI torch 패키지는 GPU 지원 자동 매칭.)
 
-Isaac Sim Python API 연동은 NVIDIA Isaac Sim 설치 디렉토리의 `python.sh` 또는 `setup_python_env.sh` 스크립트를 이용해 PYTHONPATH를 주입해야 합니다.
-
-주의:
-- View RoArm/Isaac 관련 스크립트를 실행하려면 `ISAAC_SIM_ROOT` 환경변수와 해당 경로 하위의 `python.sh`가 필요합니다. (예: `/home/user/isaac_sim/python.sh`)
-- 환경 진단 결과에서 `omni.isaac.core` 임포트 실패가 보이면, 반드시 Isaac 번들 파이썬(`python.sh`)으로 실행하세요.
-
-### 환경 빠른 점검 (필수)
-Isaac Sim 번들 Python(보통 3.11)과 시스템/venv Python(예: 3.12) 버전이 다르면 임포트 문제가 발생합니다. 아래 스크립트로 현재 상태를 점검하세요.
+Isaac Sim 5.0.0은 별도 ZIP 설치 대신 pip 메타패키지로 통합 배포됩니다. 권장 절차:
 
 ```bash
-# Isaac 설치 루트를 자동 탐색하고, 번들 파이썬/시스템 파이썬/임포트 가능 여부를 요약 출력
+python3.11 -m venv ~/isaacsim-venv
+source ~/isaacsim-venv/bin/activate
+pip install -U pip
+pip install isaacsim[all,extscache]==5.0.0 --extra-index-url https://pypi.nvidia.com
+```
+
+이후 Isaac Sim이 필요한 터미널에서는 가상환경을 활성화한 뒤 아래 스크립트를 호출하면 USD/pxr 경로와 라이브러리가 자동 등록됩니다.
+
+```bash
+source scripts/activate_isaacsim_env.sh            # 기본 위치 ~/isaacsim-venv 사용
+# 또는 별도 경로 사용 시
+source scripts/activate_isaacsim_env.sh /path/to/custom-venv
+```
+
+스크립트는 `OMNI_KIT_ACCEPT_EULA=YES`, `PYTHONPATH`, `LD_LIBRARY_PATH` 등을 적절히 설정하고 `from pxr import Usd` 스모크 테스트 결과를 출력합니다. Isaac 관련 모든 Python 스크립트는 이 환경이 활성화되어 있다는 가정하에 동작합니다.
+
+### 환경 빠른 점검 (필수)
+아래 명령으로 Isaac 전용 가상환경과 pxr 모듈 상태를 자동 점검할 수 있습니다.
+
+```bash
+# Isaac 전용 venv + USD 경로 감지, pxr 임포트 결과 요약
 scripts/isaac_precheck.sh
 
-# 번들 환경 또는 setup_python_env.sh 로드 후 임포트 검사만 별도로 수행
+# 현재 셸이 activate_isaacsim_env.sh 를 통과했는지 확인 (pxr/isaacsim 모듈 검사)
 python scripts/check_isaac_import.py
 ```
 
-결과 해석:
-- bundled_python: Isaac 번들 파이썬 버전 (예: 3.11.x)
-- system_python: 현재 셸의 파이썬 버전 (예: 3.12.x)
-- import_ok=false 이면, `omni.isaac.core` 등 핵심 모듈 임포트 실패이므로 `python.sh`로 스크립트를 실행하거나 `setup_python_env.sh`로 환경을 로드해야 합니다.
+출력 키 포인트:
+- `venv_python`: Isaac 전용 가상환경의 파이썬 버전 (예: 3.11.x)
+- `system_python`: 현재 셸의 파이썬 버전 (예: 3.12.x)
+- `pxr_import`: `true`가 아니면 `source scripts/activate_isaacsim_env.sh` 실행 여부 확인
 
 ## VS Code 환경 구성 (자동화)
 프로젝트를 열면 `.vscode/` 하위 설정이 적용됩니다.
@@ -86,7 +99,7 @@ python scripts/check_isaac_import.py
 code .  # VS Code로 폴더 오픈 후
 # 명령 팔레트 (Ctrl+Shift+P) → Tasks: Run Task → Train PPO (quick)
 # 명령 팔레트 → Tasks: Run Task → Env Diagnostic  (환경/버전/Isaac precheck 결과를 logs/YYYY-MM-DD/env_diag_*.txt 로 저장)
-# 명령 팔레트 → Tasks: Run Task → View RoArm (USD)  (ISAAC_SIM_ROOT 설정 + python.sh 필요, 프롬프트에 USD 경로 입력)
+# 명령 팔레트 → Tasks: Run Task → View RoArm (USD)  (Isaac 전용 venv 활성화 + scripts/activate_isaacsim_env.sh 실행 후 사용)
 ```
 
 ## MCP 서버 사용
@@ -124,7 +137,7 @@ print(env.randomization)  # 샘플된 파라미터 확인
 | `scripts/check_isaac_import.py` | Isaac 핵심 모듈 임포트 가능 여부 검사 |
 | `scripts/run_mcp_isaac.sh` | 환경 변수 확인 후 MCP 서버 실행 |
 | `scripts/run_training.sh` | 학습 실행 + 로그 디렉토리 생성 |
-| `scripts/run_isaac_tool.sh` | Isaac 번들 Python 실행 (이중 환경 분리) |
+| `scripts/run_isaac_tool.sh` | Isaac 전용 venv 활성화 후 Python 스크립트 실행 |
 | `scripts/ipc_policy_gateway.py` | 관측→액션 TCP IPC 게이트웨이 stub |
 | `scripts/run_tests_local.sh` | 깨끗한 PYTHONPATH로 pytest 실행 |
 
@@ -136,15 +149,12 @@ cp .env.example .env
 필요 키를 채운 뒤 VS Code 재시작 또는 터미널에서 `export $(cat .env | xargs)`.
 
 ## Isaac Sim 연동 가이드 (기초)
-1. Isaac Sim 버전 확인 (요구: 5.0.0 대응) → GUI 실행 후 Help > About 또는 설치 디렉토리 Release Notes.
-2. Python API 경로 설정 (예시):
+1. Isaac Sim 버전 확인 (요구: 5.0.0 대응) → `pip show isaacsim` 또는 `python -c "import isaacsim, pkgutil; print(isaacsim.__version__)"`
+2. 환경 준비 흐름:
 ```bash
-source /path/to/isaac-sim/setup_python_env.sh
+source ~/isaacsim-venv/bin/activate
+source scripts/activate_isaacsim_env.sh
 python scripts/check_isaac_import.py
-```
-또는 번들 파이썬으로 직접 실행:
-```bash
-/path/to/isaac-sim/python.sh scripts/check_isaac_import.py
 ```
 3. MCP 서버에서 Isaac 제어하려면: 로컬에서 Isaac GUI 띄운 뒤 WebSocket/RPC 브릿지 (추가 구현 예정)
 

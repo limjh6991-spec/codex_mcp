@@ -43,8 +43,8 @@ run 'sed -n "1,200p" .vscode/settings.json || true'
 log "## Isaac Precheck"
 run 'scripts/isaac_precheck.sh || true'
 
-log "## Isaac Import (bundled)"
-run 'if [ -x "$ISAAC_SIM_ROOT/python.sh" ]; then "$ISAAC_SIM_ROOT/python.sh" scripts/check_isaac_import.py; else echo "python.sh not found"; fi'
+log "## Isaac Import (venv)"
+run 'VENV=${ISAACSIM_VENV:-$HOME/isaacsim-venv}; if [ -d "$VENV" ] && [ -f "$VENV/bin/activate" ]; then source "$VENV/bin/activate" && ACTIVATE_ISAACSIM_QUIET=1 source scripts/activate_isaacsim_env.sh "$VENV" && python scripts/check_isaac_import.py; else echo "Isaac Sim venv not found ($VENV)"; fi'
 
 log "## MCP Ports (if any)"
 run 'ss -ltnp | head -n 50 || true'

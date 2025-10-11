@@ -1,0 +1,101 @@
+<?xml version="1.0"?>
+<!-- Minimal RoArm M3 URDF skeleton for Isaac Sim import.
+     NOTE: This is a starting point for visualization & joint mapping only.
+     Inertia, mass, collision meshes, and exact axes/limits MUST be calibrated.
+-->
+<robot name="roarm_m3">
+  <!-- base link (world mount) -->
+  <link name="base_link">
+    <inertial>
+      <mass value="1.0"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.01" iyy="0.01" izz="0.01" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.05 0.05 0.02"/></geometry>
+      <material name="gray"><color rgba="0.6 0.6 0.6 1"/></material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.05 0.05 0.02"/></geometry>
+    </collision>
+  </link>
+
+  <!-- 1) Base continuous joint -->
+  <joint name="joint_base" type="continuous">
+    <parent link="base_link"/>
+    <child link="link_base"/>
+    <origin xyz="0 0 0.02" rpy="0 0 0"/>
+    <!-- axis TBD: assuming z-up -->
+    <axis xyz="0 0 1"/>
+  </joint>
+  <link name="link_base">
+    <visual><geometry><cylinder radius="0.03" length="0.05"/></geometry></visual>
+    <collision><geometry><cylinder radius="0.03" length="0.05"/></geometry></collision>
+  </link>
+
+  <!-- 2) Shoulder (±1.57 rad) -->
+  <joint name="joint_shoulder" type="revolute">
+    <parent link="link_base"/>
+    <child link="link_shoulder"/>
+    <origin xyz="0 0 0.05" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="10" velocity="2.0"/>
+  </joint>
+  <link name="link_shoulder">
+    <visual><geometry><cylinder radius="0.02" length="0.15"/></geometry></visual>
+    <collision><geometry><cylinder radius="0.02" length="0.15"/></geometry></collision>
+  </link>
+
+  <!-- 3) Elbow (approx 180°) -->
+  <joint name="joint_elbow" type="revolute">
+    <parent link="link_shoulder"/>
+    <child link="link_elbow"/>
+    <origin xyz="0 0 0.15" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="10" velocity="2.0"/>
+  </joint>
+  <link name="link_elbow">
+    <visual><geometry><cylinder radius="0.02" length="0.15"/></geometry></visual>
+    <collision><geometry><cylinder radius="0.02" length="0.15"/></geometry></collision>
+  </link>
+
+  <!-- 4) Wrist1 (±1.57) -->
+  <joint name="joint_wrist1" type="revolute">
+    <parent link="link_elbow"/>
+    <child link="link_wrist1"/>
+    <origin xyz="0 0 0.15" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="8" velocity="2.5"/>
+  </joint>
+  <link name="link_wrist1">
+    <visual><geometry><cylinder radius="0.018" length="0.12"/></geometry></visual>
+    <collision><geometry><cylinder radius="0.018" length="0.12"/></geometry></collision>
+  </link>
+
+  <!-- 5) Wrist2 (continuous) -->
+  <joint name="joint_wrist2" type="continuous">
+    <parent link="link_wrist1"/>
+    <child link="link_wrist2"/>
+    <origin xyz="0 0 0.12" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+  <link name="link_wrist2">
+    <visual><geometry><cylinder radius="0.015" length="0.08"/></geometry></visual>
+    <collision><geometry><cylinder radius="0.015" length="0.08"/></geometry></collision>
+  </link>
+
+  <!-- 6) Gripper (simplified single revolute) -->
+  <joint name="joint_gripper" type="revolute">
+    <parent link="link_wrist2"/>
+    <child link="link_gripper"/>
+    <origin xyz="0 0 0.08" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="1.08" upper="3.14" effort="5" velocity="3.0"/>
+  </joint>
+  <link name="link_gripper">
+    <visual><geometry><box size="0.02 0.02 0.06"/></geometry></visual>
+    <collision><geometry><box size="0.02 0.02 0.06"/></geometry></collision>
+  </link>
+</robot>

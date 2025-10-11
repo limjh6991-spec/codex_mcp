@@ -71,17 +71,111 @@ class JointAPI:
                     if not _prim_exists():
                         error_code = "PRIM_NOT_FOUND"
                     else:
-                        from omni.isaac.core.articulations import ArticulationView  # type: ignore
-                        view = ArticulationView(prim_paths_expr=prim_path, name=f"roarm_view_{prim_path.split('/')[-1]}")
-                        if hasattr(world.scene, "add"):
+                        # If a different articulation root exists under this path, prefer it
+                        attach_path = prim_path
+                        try:
+                            stage = getattr(world, "stage", None)
+                            p = stage.GetPrimAtPath(prim_path) if stage is not None else None
+                            # Search for UsdPhysics.ArticulationRootAPI
+                            if p is not None and p.IsValid():
+                                try:
+                                    from pxr import UsdPhysics  # type: ignore
+                                    if not p.HasAPI(UsdPhysics.ArticulationRootAPI):
+                                        for sub in stage.Traverse():
+                                            sp = sub.GetPath().pathString
+                                            if not sp.startswith(prim_path):
+                                                continue
+                                            try:
+                                                if sub.HasAPI(UsdPhysics.ArticulationRootAPI):
+                                                    attach_path = sp
+                                                    break
+                                            except Exception:
+                                                continue
+                                except Exception:
+                                    pass
+                        except Exception:
+                            attach_path = prim_path
+                        # Prefer 5.0+ API if available (try multiple import paths)
+                        view = None
+                        import_error_msgs = []
+                        for imp in (
+                            "from isaacsim.core.prims import Articulation as _Art",
+                            "from isaacsim.core.api.prims import Articulation as _Art",
+                            "from isaacsim.core.api.prims.articulation import Articulation as _Art",
+                        ):
                             try:
-                                world.scene.add(view)
-                            except Exception:
-                                pass
+                                _g = {}
+                                exec(imp, _g, _g)
+                                _Art = _g.get("_Art")
+                                if _Art is not None:
+                                    view = _Art(prim_path=attach_path, name=f"roarm_art_{attach_path.split('/')[-1]}")
+                                    break
+                            except Exception as e:  # noqa
+                                import_error_msgs.append(f"{imp} -> {e}")
+                                continue
+                        # Fallback to legacy ArticulationView (try exact and glob patterns)
+                        if view is None:
+                            try:
+                                from omni.isaac.core.articulations import ArticulationView  # type: ignore
+                                # Try exact path first
+                                try:
+                                    view = ArticulationView(prim_paths_expr=attach_path, name=f"roarm_view_{attach_path.split('/')[-1]}")
+                                except Exception:
+                                    view = None
+                                # If failed, try glob under the prim
+                                if view is None:
+                                    try:
+                                        pat = f"{attach_path}/*"
+                                        view = ArticulationView(prim_paths_expr=pat, name=f"roarm_view_{attach_path.split('/')[-1]}_g")
+                                    except Exception:
+                                        view = None
+                                if view is not None and hasattr(world, "scene") and hasattr(world.scene, "add"):
+                                    try:
+                                        world.scene.add(view)
+                                    except Exception:
+                                        pass
+                                # Some versions require explicit initialize
+                                if view is not None and hasattr(view, "initialize"):
+                                    try:
+                                        view.initialize()
+                                    except Exception:
+                                        pass
+                            except Exception as e:  # noqa
+                                import_error_msgs.append(f"ArticulationView import/create -> {e}")
+
+                        # Last resort: try to create an Articulation from prim directly via isaacsim.core.utils if available
+                        if view is None:
+                            try:
+                                from isaacsim.core.utils.stage import get_current_stage  # type: ignore
+                                stage = get_current_stage()
+                                prim = None
+                                if stage is not None:
+                                    prim = stage.GetPrimAtPath(prim_path)
+                                if prim is not None and prim.IsValid():
+                                    # Some 5.0 builds allow wrapping an existing prim via Articulation handle
+                                    for imp in (
+                                        "from isaacsim.core.prims import Articulation as _Art",
+                                        "from isaacsim.core.api.prims import Articulation as _Art",
+                                        "from isaacsim.core.api.prims.articulation import Articulation as _Art",
+                                    ):
+                                        try:
+                                            _g = {}
+                                            exec(imp, _g, _g)
+                                            _Art = _g.get("_Art")
+                                            if _Art is not None:
+                                                view = _Art(prim_path=prim_path, name=f"roarm_art_{prim_path.split('/')[-1]}_late")
+                                                break
+                                        except Exception:
+                                            continue
+                            except Exception as e:  # noqa
+                                import_error_msgs.append(f"last_resort_wrap -> {e}")
+
                         self._articulation = view
-                        created = True
-                        error_code = None
-                        break
+                        created = bool(view is not None)
+                        error_code = None if self._articulation is not None else (error_code or ("ATTACH_NO_BACKEND:" + ";".join(import_error_msgs[-2:])))
+                        # If attached, break; else retry
+                        if self._articulation is not None:
+                            break
                 except Exception as e:  # noqa
                     error_code = "ATTACH_FAIL"
                     self._log.debug(json.dumps({
@@ -95,13 +189,33 @@ class JointAPI:
         else:
             error_code = "ISAAC_UNAVAILABLE"
 
+        # Diagnostics: count dofs if possible
+        dof_count = None
+        try:
+            if self._articulation is not None:
+                for attr in ("num_dof", "num_dofs", "dof_count"):
+                    if hasattr(self._articulation, attr):
+                        val = getattr(self._articulation, attr)
+                        dof_count = int(val() if callable(val) else val)
+                        break
+                if dof_count is None:
+                    gdn = getattr(self._articulation, "get_dof_names", None)
+                    if callable(gdn):
+                        try:
+                            dof_count = len(list(gdn()))
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
         result = {
-            "attached": True,
+            "attached": self._articulation is not None,
             "prim_path": prim_path,
             "has_handle": self._articulation is not None,
             "created": created,
             "attempts": attempt if attempt else 1,
             "error_code": error_code,
+            "dof_count": dof_count,
         }
         self._log.debug(json.dumps({"event": "attach_result", **result}))
         return result
@@ -120,24 +234,33 @@ class JointAPI:
         # 실제 Isaac articulation view가 제공하는 API 버전에 따라 메서드 이름 상이할 수 있음.
         # 대표 패턴: get_joints() → list[Joint] with .name attribute
         try:  # pragma: no cover - Isaac 환경 필요
-            joints = getattr(self._articulation, "get_joints", None)
-            if callable(joints):
-                objs = joints()
-                names = []
-                for j in objs:
-                    name = getattr(j, "name", None)
-                    if name is None:
-                        # 일부 API는 get_name() 사용
-                        get_name = getattr(j, "get_name", None)
-                        if callable(get_name):
-                            name = get_name()
-                    if name:
-                        names.append(str(name))
-                return names
-            # 대안: get_joint_names()
-            get_joint_names = getattr(self._articulation, "get_joint_names", None)
-            if callable(get_joint_names):
-                return list(get_joint_names())
+            # 1) Newer API often exposes DOF names
+            for meth in ("get_joint_names", "get_dof_names"):
+                fn = getattr(self._articulation, meth, None)
+                if callable(fn):
+                    try:
+                        names = fn()
+                        return list(names)
+                    except Exception:
+                        pass
+            # 2) Legacy: get_joints() returning objects with name or get_name
+            get_joints = getattr(self._articulation, "get_joints", None)
+            if callable(get_joints):
+                try:
+                    objs = get_joints()
+                    names = []
+                    for j in objs:
+                        name = getattr(j, "name", None)
+                        if not name:
+                            get_name = getattr(j, "get_name", None)
+                            if callable(get_name):
+                                name = get_name()
+                        if name:
+                            names.append(str(name))
+                    if names:
+                        return names
+                except Exception:
+                    pass
         except Exception:
             return []
         return []
@@ -156,8 +279,13 @@ class JointAPI:
             return {"positions": self._last_positions, "velocities": self._last_velocities}
         # 실제 Isaac articulation view 사용 시도
         try:  # pragma: no cover - Isaac 환경 필요
+            # Prefer joint_*; fallback to dof_*
             get_pos = getattr(self._articulation, "get_joint_positions", None)
             get_vel = getattr(self._articulation, "get_joint_velocities", None)
+            if not callable(get_pos):
+                get_pos = getattr(self._articulation, "get_dof_positions", None)
+            if not callable(get_vel):
+                get_vel = getattr(self._articulation, "get_dof_velocities", None)
             if callable(get_pos):
                 q = get_pos()
                 if hasattr(q, "tolist"):
@@ -219,6 +347,8 @@ class JointAPI:
             import numpy as np  # local import to avoid cost when Isaac 미가용
             # 현재 joint positions 조회
             get_pos = getattr(self._articulation, "get_joint_positions", None)
+            if not callable(get_pos):
+                get_pos = getattr(self._articulation, "get_dof_positions", None)
             cur = None
             if callable(get_pos):
                 cur = get_pos()
@@ -238,6 +368,8 @@ class JointAPI:
                 saturated = bool(np.any(pre != target))
             # 실제 Isaac 호출 (예외 안전)
             set_targets = getattr(self._articulation, "set_joint_position_targets", None)
+            if not callable(set_targets):
+                set_targets = getattr(self._articulation, "set_dof_position_targets", None)
             if callable(set_targets):
                 set_targets(target)
             verified: Dict[str, Any] = {}

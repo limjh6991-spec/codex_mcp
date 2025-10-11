@@ -60,7 +60,29 @@
             "command": "bash",
             "args": [
                 "-lc",
-                "if [ -n \"${ISAAC_SIM_ROOT}\" ] && [ -x \"${ISAAC_SIM_ROOT}/python.sh\" ]; then \n  \"${ISAAC_SIM_ROOT}/python.sh\" scripts/view_roarm.py --usd '${input:usdPath}' --steps 300; \nelif [ -n \"${ISAAC_SIM_ROOT}\" ] && [ -f \"${ISAAC_SIM_ROOT}/setup_python_env.sh\" ]; then \n  source \"${ISAAC_SIM_ROOT}/setup_python_env.sh\" && python scripts/view_roarm.py --usd '${input:usdPath}' --steps 300; \nelse \n  echo 'ISAAC_SIM_ROOT not set or python.sh missing. Set ISAAC_SIM_ROOT in .vscode/settings.json or shell.'; exit 1; \nfi"
+                "scripts/run_isaac_tool.sh scripts/view_roarm.py --usd '${input:usdPath}' --prim '${input:primPath}' --steps 300"
+            ],
+            "problemMatcher": [],
+            "group": "none"
+        },
+        {
+            "label": "Scan RoArm USD",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-lc",
+                "scripts/run_isaac_tool.sh scripts/view_roarm.py --usd '${input:usdPath}' --scan --headless"
+            ],
+            "problemMatcher": [],
+            "group": "none"
+        },
+        {
+            "label": "Apply Articulation Root",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-lc",
+                "scripts/run_isaac_tool.sh scripts/apply_articulation_root.py --usd '${input:usdPath}' --prim '${input:primPath}'"
             ],
             "problemMatcher": [],
             "group": "none"
@@ -77,7 +99,13 @@
             "id": "usdPath",
             "type": "promptString",
             "description": "Path to robot USD file",
-            "default": "${workspaceFolder}/assets/roarm.usd"
+            "default": "${workspaceFolder}/assets/roarm_m3/usd/roarm_m3.usd"
+        },
+        {
+            "id": "primPath",
+            "type": "promptString",
+            "description": "Root prim path for articulation (see 'Scan RoArm USD')",
+            "default": "/World/roarm_m3"
         }
     ]
 }

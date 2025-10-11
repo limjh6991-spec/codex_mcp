@@ -4,11 +4,22 @@
  1) isaacsim.simulation_app (신 API)
  2) omni.isaac.kit (구 API, deprecated 경고 가능)
  3) omni.isaac.core (핵심 모듈)
-ISAAC_SIM_ROOT/python.sh 또는 setup_python_env.sh로 환경이 구성되어야 합니다.
+`source scripts/activate_isaacsim_env.sh` 실행 후 사용하세요.
 """
 from __future__ import annotations
 import sys
 import importlib
+
+# If available, initialize SimulationApp early to allow core imports
+_sim_app = None
+try:
+    from isaacsim.simulation_app import SimulationApp  # type: ignore
+    try:
+        _sim_app = SimulationApp({"headless": True})  # ensure kit is up
+    except Exception:
+        _sim_app = None
+except Exception:
+    SimulationApp = None  # type: ignore
 
 results = []
 
@@ -38,7 +49,17 @@ for name, success, err in results:
 
 if ok:
     print("[OK] Isaac Sim 기본 임포트 점검 통과")
+    try:
+        if _sim_app is not None:
+            _sim_app.close()
+    except Exception:
+        pass
     sys.exit(0)
 else:
     print("[FAIL] Isaac Sim 핵심 모듈 일부 임포트 실패")
+    try:
+        if _sim_app is not None:
+            _sim_app.close()
+    except Exception:
+        pass
     sys.exit(1)
