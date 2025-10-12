@@ -1,12 +1,12 @@
 # Project Status
-_Last updated: 2025-10-11_
+_Last updated: 2025-10-12_
 
 ## Environment Snapshot
 | Item | Value | Notes |
 |------|-------|-------|
 | Isaac Sim Version | 5.0 (pip, headless-capable) | Installed inside dedicated venv |
 | Python Venv | `~/isaacsim-venv` | Activate via `scripts/activate_isaacsim_env.sh` |
-| GPU | RTX 5090 + AMD iGPU | AMD is auto-disabled; watch CUDA driver warnings |
+| GPU | RTX 5090 + AMD iGPU | AMD auto-disabled. PyTorch는 임시로 CPU 강제 실행 중 |
 | Extension Overrides | TOML under `~/.local/share/ov/data/Kit/Isaac-Sim Full/5.0/exts/user/` | Requires launcher flags to guarantee disable |
 
 ## Workboard
@@ -17,13 +17,13 @@ _Last updated: 2025-10-11_
 4. Draft real-world parameter bounds for `configs/domain_randomization.yaml` (friction, latency, mass, gripper contact).
 
 ### In Progress
-- None (end-of-day).
+- PyTorch CUDA(sm_120) 호환 빌드 조사 및 Isaac Sim 런타임과의 버전 정합 계획 수립.
 
 ### Blocked / Watchlist
 - Real hardware calibration pending — gather friction/mass measurements once rig is ready.
 - Extension persistence: reliance on KIT dependency tree means some packages may re-enable until launcher flags are tuned.
 
 ### Recently Completed
-- Added `scripts/manage_isaacsim_extensions.py` and applied to priority extensions.
-- Verified USD includes `/World/roarm_m3/link5/hand_tcp` and documented Stage navigation guidance.
-- Outlined Sim2Real RL roadmap (USD pre-training → calibration → feedback loop).
+- `training/train_ppo.py`에 SB3 디바이스 스위치(`--device {auto,cpu,cuda}`) 추가.
+- Isaac Sim 환경에서 PPO 스모크 테스트를 CPU 경로로 통과시키고 정책 저장(`policies/ppo_roarm.zip`) 확인.
+- README 및 작업 요약 문서를 최신 현황으로 갱신.

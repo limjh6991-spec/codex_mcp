@@ -9,11 +9,13 @@ __pycache__/
 venv/
 
 # Logs
-logs/
+logs/*
 !logs/README.md
+!logs/*/
 log/
 !log/README.md
 *.log
+!logs/*/progress.log
 *.jsonl
 *.jsonl.*
 *.prom
@@ -40,6 +42,7 @@ artifacts/
 
 # Misc
 .DS_Store
+context_bridge/context_bundle.md
 
 # Isaac Sim generated artifacts
 assets/roarm_m3/usd/*

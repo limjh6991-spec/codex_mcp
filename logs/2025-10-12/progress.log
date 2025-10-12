@@ -1,0 +1,28 @@
+[2025-10-12] 프로젝트 진행 로그
+
+== 개요 ==
+Stable-Baselines3 PPO 학습 루프가 Isaac Sim 환경과 결합된 상태에서 GPU 미지원 문제를 우회하고 정상 종료됨을 확인. SB3/PyTorch 디바이스 선택 옵션을 추가하여 향후 GPU 재활성화 준비 근거를 마련했다.
+
+== 주요 완료 항목 ==
+1. 학습 스크립트 개선
+   - `training/train_ppo.py`에 `--device {auto,cpu,cuda}` 플래그 및 `TrainConfig.device` 필드 추가.
+   - PPO 인스턴스 생성 시 지정 디바이스를 사용하도록 반영.
+2. 실행 검증
+   - Isaac 전용 Python 환경에서 `~/python.sh training/train_ppo.py --total_timesteps 2 --env-kind isaac --seed 42 --device cpu` 실행.
+   - FPS ≈1259, 정책 파일 `policies/ppo_roarm.zip` 생성, CUDA 관련 치명 오류 미발생.
+3. 문서 업데이트
+   - README에 2025-10-12 업데이트 섹션 추가 및 `--device` 옵션 설명 보강.
+   - `docs/STATUS.md`, `docs/오늘_작업_요약.md`, `docs/daily/2025-10-12.md` 갱신.
+
+== 현재 과제/리스크 ==
+- PyTorch 2.3.0 공식 wheel이 RTX 5090(sm_120) 아키텍처를 지원하지 않아 GPU 학습 불가.
+- Isaac Sim은 여전히 CUDA 디바이스 초기화를 시도하므로 향후 PyTorch CUDA 빌드 정합이 필수.
+
+== 다음 액션 제안 ==
+1. NVIDIA 제공 PyTorch nightly 혹은 wheel에서 sm_120 지원 여부 확인 및 테스트.
+2. GPU 모드 재활성화 후 학습 속도/안정성 벤치마크 수행.
+3. `verify_usd_roarm_m3.py` CLI 복구 및 Isaac 관절 attach 경로 강화.
+4. Domain randomization 파라미터에 실측 데이터를 반영하는 캘리브레이션 계획 수립.
+
+== 작성 시각 ==
+2025-10-12T15:35:00Z (UTC 기준)
