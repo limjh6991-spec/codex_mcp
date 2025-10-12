@@ -71,6 +71,8 @@ fi
 
 export ISAACSIM_ROOT="$__isaac_root"
 export ISAACSIM_USD_LIBS="$__usd_libs_dir"
+export ISAAC_SIM_ROOT="$ISAACSIM_ROOT"
+export ISAAC_SIM_PATH="${ISAAC_SIM_PATH:-$ISAACSIM_ROOT}"
 
 PYTHONPATH_ENTRY="$ISAACSIM_USD_LIBS"
 if [[ -z "${PYTHONPATH:-}" ]]; then
@@ -113,3 +115,25 @@ PY
 fi
 
 unset __isaac_root __usd_libs_dir PYTHONPATH_ENTRY LD_ENTRY
+
+# Preferred headless renderer configuration
+export KIT_USE_EGL="${KIT_USE_EGL:-1}"
+export OMNI_KIT_FORCE_VULKAN="${OMNI_KIT_FORCE_VULKAN:-0}"
+export __NV_PRIME_RENDER_OFFLOAD="${__NV_PRIME_RENDER_OFFLOAD:-1}"
+export __GLX_VENDOR_LIBRARY_NAME="${__GLX_VENDOR_LIBRARY_NAME:-nvidia}"
+export __NV_PRIME_RENDER_OFFLOAD_PROVIDER="${__NV_PRIME_RENDER_OFFLOAD_PROVIDER:-NVIDIA-G0}"
+export EGL_PLATFORM="${EGL_PLATFORM:-surfaceless}"
+export EGL_PLATFORM_DEVICE="${EGL_PLATFORM_DEVICE:-0}"
+export VK_ICD_FILENAMES="${VK_ICD_FILENAMES:-/usr/share/vulkan/icd.d/nvidia_icd.json}"
+export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
+
+export MESA_LOADER_DRIVER_OVERRIDE="${MESA_LOADER_DRIVER_OVERRIDE:-nvidia}"
+export __VK_LAYER_NV_optimus="${__VK_LAYER_NV_optimus:-NVIDIA_only}"
+
+if [[ -z "${__EGL_VENDOR_LIBRARY_FILENAMES:-}" ]]; then
+  __nvidia_egl_vendor="/usr/share/glvnd/egl_vendor.d/10_nvidia.json"
+  if [[ -f "$__nvidia_egl_vendor" ]]; then
+    export __EGL_VENDOR_LIBRARY_FILENAMES="$__nvidia_egl_vendor"
+  fi
+  unset __nvidia_egl_vendor
+fi

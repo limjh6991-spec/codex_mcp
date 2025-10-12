@@ -6,6 +6,11 @@
 - 일일 로그(`docs/daily/`)와 상태 보드(`docs/STATUS.md`)를 통해 작업 흐름과 잔여 이슈를 추적합니다.
 - Isaac 확장 토글을 자동화하는 `scripts/manage_isaacsim_extensions.py`와 각종 환경 점검 스크립트를 제공합니다.
 
+### 2025-10-13 업데이트
+- 다중 GPU 환경에서 Isaac Sim이 AMD iGPU 경로로 초기화되던 문제를 해결하기 위해 `scripts/activate_isaacsim_env.sh`에 NVIDIA 전용 Vulkan/GLX/EGL 기본값을 추가했습니다. 이제 Isaac 세션을 시작하면 자동으로 RTX 5090 ICD만 로드되어 llvmpipe/RADV 경로가 차단됩니다.
+- 갱신된 환경에서 `python scripts/open_roarm_m3_gui.py --mode train` 헤드리스 런을 재검증한 결과, 13만 스텝 이상 연속 실행 동안 pre-startup crash가 더 이상 재현되지 않았습니다. 헤드리스 모드에서 GUI/Replicator 확장 비활성화 정책(`scripts/config/roarm_headless.overlay.kit`)도 그대로 유지됩니다.
+- NVIDIA-only 설정은 `VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json`, `MESA_LOADER_DRIVER_OVERRIDE=nvidia`, `__VK_LAYER_NV_optimus=NVIDIA_only` 등을 포함하므로, 다른 사용 환경에서도 동일한 결과를 재현하려면 `scripts/activate_isaacsim_env.sh`를 통해 세션을 시작하세요.
+
 ### 2025-10-12 업데이트
 - `training/train_ppo.py`에 `--device {auto,cpu,cuda}` 옵션을 추가하여 Stable-Baselines3가 사용할 연산 디바이스를 제어할 수 있게 했습니다. Isaac Sim은 여전히 GPU 메모리를 초기화하지만, PyTorch가 RTX 5090(sm_120) 대응 빌드가 없는 동안엔 `--device cpu`로 임시 우회가 가능합니다.
 - Isaac Sim 전용 Python 환경(3.11)에서 PPO 스모크 테스트(`--env-kind isaac`, `--total_timesteps 2`)를 CPU 경로로 통과시켜 정책(`policies/ppo_roarm.zip`) 저장을 확인했습니다.
@@ -71,6 +76,8 @@ pip install isaacsim[all,extscache]==5.0.0 \
    ```
    생성되는 TOML은 `~/.local/share/ov/data/Kit/Isaac-Sim Full/5.0/exts/user/` 아래에 저장되며, 런처 플래그(`--disable`, `--enableOnly`)와 함께 사용할 때 가장 확실하게 적용됩니다. 실험 결과와 권장 조합은 `docs/STATUS.md`의 "Open Todos" 섹션을 참고하세요.
 
+4. Headless 학습 런처: `python scripts/open_roarm_m3_gui.py --mode train`을 사용하면 `scripts/config/roarm_headless.overlay.kit`을 Isaac Sim 앱 디렉터리에 복사해 GUI/Replicator 계열 확장을 선제적으로 차단합니다. 기본적으로 `KIT_USE_EGL=1`, `ENABLE_HEADLESS=1`, `CARB_APP_QUIET_SHUTDOWN=1` 등을 자동 설정하며, `ROARM_ENABLE_REPLICATOR=1`로 재활성화할 수 있습니다. 종료 시에는 타임라인 정지→USD 스테이지 닫기→Kit/SimulationApp 순으로 정리하여 headless 세그폴트를 방지합니다.
+
 ## 강화학습 파이프라인
 - 기본 Dummy 환경은 `src/envs/base_env.py`와 `training/train_ppo.py`로 구성되어 있으며, SB3 PPO를 통해 즉시 학습을 돌려볼 수 있습니다.
 - 실행 예시:
@@ -97,7 +104,7 @@ pip install isaacsim[all,extscache]==5.0.0 \
 - TODO: 실제 Isaac 환경(`src/envs/isaac_roarm_env.py`)을 PPO 루프에 연결하고, 마찰/질량/지연 값을 현장 측정값으로 업데이트해야 합니다. (상세는 `docs/STATUS.md`의 Open Todos 참고)
 
 ## 문서화 & 작업 흐름
-- `docs/daily/YYYY-MM-DD.md`: 작업 로그 + 이슈 + 다음날 계획. 최신 기록은 `docs/daily/2025-10-11.md`.
+- `docs/daily/YYYY-MM-DD.md`: 작업 로그 + 이슈 + 다음날 계획. 최신 기록은 `docs/daily/2025-10-13.md`.
 - `docs/STATUS.md`: 환경 스냅샷, Open Todos, Blocked 항목 등 상시 업데이트되는 보드.
 - 요구사항/배경 참조는 레포 루트의 `배경설명`, 설계 결정은 `docs/ARCH_DECISION_*.md` 시리즈에서 확인합니다.
 - 하루를 시작할 때는 `매일_작업_시작_체크리스트.md`로 환경 점검 → README/STATUS 반영 순서를 유지합니다.
