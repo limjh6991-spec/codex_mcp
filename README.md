@@ -10,6 +10,7 @@
 - 다중 GPU 환경에서 Isaac Sim이 AMD iGPU 경로로 초기화되던 문제를 해결하기 위해 `scripts/activate_isaacsim_env.sh`에 NVIDIA 전용 Vulkan/GLX/EGL 기본값을 추가했습니다. 이제 Isaac 세션을 시작하면 자동으로 RTX 5090 ICD만 로드되어 llvmpipe/RADV 경로가 차단됩니다.
 - 갱신된 환경에서 `python scripts/open_roarm_m3_gui.py --mode train` 헤드리스 런을 재검증한 결과, 13만 스텝 이상 연속 실행 동안 pre-startup crash가 더 이상 재현되지 않았습니다. 헤드리스 모드에서 GUI/Replicator 확장 비활성화 정책(`scripts/config/roarm_headless.overlay.kit`)도 그대로 유지됩니다.
 - NVIDIA-only 설정은 `VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json`, `MESA_LOADER_DRIVER_OVERRIDE=nvidia`, `__VK_LAYER_NV_optimus=NVIDIA_only` 등을 포함하므로, 다른 사용 환경에서도 동일한 결과를 재현하려면 `scripts/activate_isaacsim_env.sh`를 통해 세션을 시작하세요.
+- RTX 5090 (SM 12.0) 지원 PyTorch 빌드가 공개되기 전까지 학습은 `training/train_ppo.py --device cpu` 옵션으로 CPU 경로를 기본값으로 운영합니다. `pip install "tqdm>=4.64" rich`를 통해 Stable-Baselines3 진행률 콜백 의존성을 충족했고, 2,000 스텝 PPO 학습이 성공적으로 완료되어 정책(`policies/ppo_roarm_headless.zip`)이 생성되었습니다. 향후 RTX 50 시리즈 대응 휠 공개 여부는 PyTorch/Isaac Sim 릴리스 노트를 주기적으로 모니터링합니다.
 
 ### 2025-10-12 업데이트
 - `training/train_ppo.py`에 `--device {auto,cpu,cuda}` 옵션을 추가하여 Stable-Baselines3가 사용할 연산 디바이스를 제어할 수 있게 했습니다. Isaac Sim은 여전히 GPU 메모리를 초기화하지만, PyTorch가 RTX 5090(sm_120) 대응 빌드가 없는 동안엔 `--device cpu`로 임시 우회가 가능합니다.
