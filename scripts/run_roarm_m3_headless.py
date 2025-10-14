@@ -10,7 +10,29 @@ Usage:
     python scripts/run_roarm_m3_headless.py --usd assets/roarm_m3/urdf/roarm_m3.clean/roarm_m3.clean.usd --prim /roarm_m3 --steps 120
 """
 from __future__ import annotations
-import argparse, sys, time, os
+import argparse, sys, time, os, math
+
+try:
+    import carb  # type: ignore
+except ImportError:  # pragma: no cover
+    carb = None  # type: ignore
+
+
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
+
+def _resolve_world_api():
+    """Return (WorldCls, open_stage_fn) using the newest Isaac Sim API if available."""
+    try:
+        from isaacsim.core.api import World as _World  # type: ignore
+        from isaacsim.core.utils.stage import open_stage as _open_stage  # type: ignore[attr-defined]
+        return _World, _open_stage
+    except Exception:
+        from omni.isaac.core import World as _World  # type: ignore
+        from omni.isaac.core.utils.stage import open_stage as _open_stage  # type: ignore
+        return _World, _open_stage
 
 
 def parse_args():
@@ -82,10 +104,17 @@ def main():
         print(f"[spawner] ERROR: file not found: {args.usd}")
         return 2
 
+    if carb is not None:
+        settings = carb.settings.get_settings()
+        for ext in (
+            "omni.isaac.legacy",
+            "omni.isaac.sensor_legacy",
+        ):
+            settings.set(f"/exts/{ext}/enabled", False)
+
     app = ensure_app(headless=args.headless)
-    # Load stage
-    from omni.isaac.core import World  # type: ignore
-    from omni.isaac.core.utils.stage import open_stage  # type: ignore
+    # Load stage using preferred API
+    World, open_stage = _resolve_world_api()
     from omni.usd import get_context  # type: ignore
 
     open_stage(args.usd)
@@ -142,18 +171,55 @@ def main():
     names = api.list_joints()
     print("[spawner] joints:", names)
     # Report DOF limits if available
+    dof_info = {"names": [], "lower": [], "upper": []}
     try:
         dof_info = api.get_dof_limits()
-        if dof_info.get("names"):
-            print("[spawner] dof_count:", len(dof_info["names"]))
-            print("[spawner] dof_limits.lower:", dof_info.get("lower"))
-            print("[spawner] dof_limits.upper:", dof_info.get("upper"))
     except Exception:
         pass
+    if dof_info.get("names"):
+        print("[spawner] dof_count:", len(dof_info["names"]))
+        print("[spawner] dof_limits.lower:", dof_info.get("lower"))
+        print("[spawner] dof_limits.upper:", dof_info.get("upper"))
+
+    lower_bounds: list[float] = []
+    upper_bounds: list[float] = []
+    drive_eps = 1e-3
+    default_span = math.tau
+    if names:
+        raw_lower = list(dof_info.get("lower") or [])
+        raw_upper = list(dof_info.get("upper") or [])
+        for idx, _ in enumerate(names):
+            lo = raw_lower[idx] if idx < len(raw_lower) and raw_lower[idx] is not None else -default_span
+            hi = raw_upper[idx] if idx < len(raw_upper) and raw_upper[idx] is not None else default_span
+            try:
+                lo = float(lo)
+            except Exception:
+                lo = -default_span
+            try:
+                hi = float(hi)
+            except Exception:
+                hi = default_span
+            if not math.isfinite(lo):
+                lo = -default_span
+            if not math.isfinite(hi):
+                hi = default_span
+            if hi - lo < drive_eps * 10:
+                mid = (hi + lo) * 0.5
+                lo = mid - default_span * 0.5
+                hi = mid + default_span * 0.5
+            lower_bounds.append(lo + drive_eps)
+            upper_bounds.append(hi - drive_eps)
+
+    def _safe_amplitude(index: int, base_amp: float = 0.1, scale: float = 0.45) -> float:
+        if not lower_bounds or index >= len(lower_bounds) or index >= len(upper_bounds):
+            return base_amp
+        span = upper_bounds[index] - lower_bounds[index]
+        if span <= 0:
+            return base_amp
+        return max(0.0, min(base_amp, span * scale))
 
     # Short loop
     steps = max(1, args.steps)
-    import math
     for i in range(steps):
         world.step(render=not args.headless)
         if i % 30 == 0:
@@ -164,12 +230,20 @@ def main():
             try:
                 n = len(names)
                 if n > 0:
-                    amp = 0.1
                     cmd = [0.0] * n
                     # slow sine deltas
+                    phase = 2 * math.pi * (i / max(1.0, steps))
                     for k in range(min(3, n)):
-                        cmd[k] = amp * math.sin(2 * math.pi * (i / max(1.0, steps)))
-                    api.apply_delta(cmd, verify=False)
+                        amp = _safe_amplitude(k)
+                        if amp <= 0.0:
+                            continue
+                        cmd[k] = amp * math.sin(phase)
+                    api.apply_delta(
+                        cmd,
+                        lower=lower_bounds if lower_bounds else None,
+                        upper=upper_bounds if upper_bounds else None,
+                        verify=False,
+                    )
             except Exception:
                 pass
         time.sleep(0.005)

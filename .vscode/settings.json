@@ -25,6 +25,18 @@
                 "PYTHONUNBUFFERED": "1",
                 "ISAAC_SIM_PATH": "${env:ISAAC_SIM_PATH}"
             }
+        },
+        {
+            "name": "ContextBridgeMcp",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}/context_bridge/context_bridge_mcp.py"
+            ],
+            "env": {
+                "PYTHONUNBUFFERED": "1",
+                "OPENAI_API_KEY": "${env:OPENAI_API_KEY}",
+                "ANTHROPIC_API_KEY": "${env:ANTHROPIC_API_KEY}"
+            }
         }
     ]
 }

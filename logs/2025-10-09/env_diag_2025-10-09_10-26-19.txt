@@ -1,0 +1,150 @@
+# RoArm Environment Diagnostic (2025-10-09_10-26-19)
+
+## System
+> uname -a
+Linux pepperai-System-Product-Name 6.14.0-33-generic #33~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Fri Sep 19 17:02:30 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+
+> lsb_release -a || cat /etc/os-release
+Distributor ID:	Ubuntu
+Description:	Ubuntu 24.04.3 LTS
+Release:	24.04
+Codename:	noble
+
+> echo SHELL=$SHELL
+SHELL=/bin/bash
+
+## Python (system)
+> which python || true
+/usr/bin/python
+
+> python --version || true
+Python 3.12.3
+
+> python -c "import sys; print(sys.version);" || true
+3.12.3 (main, Aug 14 2025, 17:47:21) [GCC 13.3.0]
+
+## Virtualenv / Conda
+> echo VIRTUAL_ENV=${VIRTUAL_ENV:-}
+VIRTUAL_ENV=
+
+> conda env list || echo "conda not available"
+bash: 줄 1: conda: 명령어를 찾을 수 없음
+conda not available
+
+## GPU / Drivers
+> nvidia-smi || echo "nvidia-smi not available"
+Thu Oct  9 10:26:20 2025       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.95.05              Driver Version: 580.95.05      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GeForce RTX 5090        On  |   00000000:01:00.0 Off |                  N/A |
+|  0%   34C    P8              7W /  575W |      18MiB /  32607MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A            2870      G   /usr/lib/xorg/Xorg                        4MiB |
++-----------------------------------------------------------------------------------------+
+
+## ROS2
+> ros2 doctor || echo "ros2 not available"
+bash: 줄 1: ros2: 명령어를 찾을 수 없음
+ros2 not available
+
+## Git
+> git status -sb
+## master...origin/master [다음 앞에: 5]
+ M .vscode/tasks.json
+ M CHANGELOG.md
+ M assets/roarm_m3/joint_spec.json
+ M configs/schemas/obs_action_schema.json
+ M docs/OBSERVABILITY.md
+ M docs/PERF_BASELINE.md
+ M "\353\247\244\354\235\274_\354\236\221\354\227\205_\354\213\234\354\236\221_\354\262\264\355\201\254\353\246\254\354\212\244\355\212\270.md"
+?? scripts/check_perf_threshold.py
+?? scripts/generate_perf_baseline.py
+?? scripts/roarm_env_diag.sh
+?? tests/test_deadline_escalation.py
+?? tests/test_joint_limit_enforcement.py
+?? tests/test_joint_spec_mismatch.py
+
+> git log -1 --oneline
+4841b4f docs: add daily start checklist; scripts: add view_roarm GUI loop
+
+## VS Code settings (MCP)
+> sed -n "1,200p" .vscode/settings.json || true
+{
+    "python.defaultInterpreterPath": ".venv/bin/python",
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.analysis.autoImportCompletions": true,
+    "editor.formatOnSave": true,
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.mypy_cache": true
+    },
+    "terminal.integrated.env.linux": {
+        "PYTHONUNBUFFERED": "1"
+    },
+    "mcp.servers": [
+        {
+            "name": "isaac",
+            "command": "python",
+            "args": [
+                "mcp_servers/isaac_controller_server.py"
+            ],
+            "env": {
+                "PYTHONUNBUFFERED": "1",
+                "ISAAC_SIM_PATH": "${env:ISAAC_SIM_PATH}"
+            }
+        }
+    ]
+}
+## Isaac Precheck
+> scripts/isaac_precheck.sh || true
+[precheck] repo_dir=/home/roarm_m3/codex_mcp
+[precheck] isaac_root=/home/roarm_m3/isaac_sim
+[precheck] version_file=missing
+[precheck] bundled_python via python.sh: 3.11.13 (tags/v3.11.13-dirty:498b971, Jun  9 2025, 16:37:36) [GCC 7.3.1 20180303 (Red Hat 7.3.1-5)]
+[Warning] [omni.isaac.kit] omni.isaac.kit has been deprecated in favor of isaacsim.simulation_app. Please update your code accordingly.
+[OK] isaacsim.simulation_app
+[OK] omni.isaac.kit
+[FAIL] omni.isaac.core: No module named 'omni.isaac.core'
+[FAIL] Isaac Sim 핵심 모듈 일부 임포트 실패
+There was an error running python
+[precheck] system_python: 3.12.3 (main, Aug 14 2025, 17:47:21) [GCC 13.3.0]
+{"ok": true, "isaac_root": "/home/roarm_m3/isaac_sim", "version_file": false, "bundled_python": "3.11.13 (tags/v3.11.13-dirty:498b971, Jun  9 2025, 16:37:36) [GCC 7.3.1 20180303 (Red Hat 7.3.1-5)]", "system_python": "3.12.3 (main, Aug 14 2025, 17:47:21) [GCC 13.3.0]", "import_ok": "false"}
+
+## Isaac Import (bundled)
+> if [ -x "$ISAAC_SIM_ROOT/python.sh" ]; then "$ISAAC_SIM_ROOT/python.sh" scripts/check_isaac_import.py; else echo "python.sh not found"; fi
+python.sh not found
+
+## MCP Ports (if any)
+> ss -ltnp | head -n 50 || true
+State  Recv-Q Send-Q Local Address:Port  Peer Address:PortProcess                            
+LISTEN 0      5          127.0.0.1:61209      0.0.0.0:*                                      
+LISTEN 0      4096       127.0.0.1:11434      0.0.0.0:*                                      
+LISTEN 0      4096   127.0.0.53%lo:53         0.0.0.0:*                                      
+LISTEN 0      5          127.0.0.1:45321      0.0.0.0:*    users:(("python3",pid=11191,fd=3))
+LISTEN 0      4096       127.0.0.1:631        0.0.0.0:*                                      
+LISTEN 0      4096       127.0.0.1:33309      0.0.0.0:*                                      
+LISTEN 0      511        127.0.0.1:36216      0.0.0.0:*    users:(("code",pid=4566,fd=105))  
+LISTEN 0      511        127.0.0.1:3000       0.0.0.0:*    users:(("code",pid=5996,fd=40))   
+LISTEN 0      200        127.0.0.1:5432       0.0.0.0:*                                      
+LISTEN 0      64         127.0.0.1:5345       0.0.0.0:*                                      
+LISTEN 0      4096      127.0.0.54:53         0.0.0.0:*                                      
+LISTEN 0      2                  *:3389             *:*                                      
+LISTEN 0      4096           [::1]:631           [::]:*                                      
+LISTEN 0      2              [::1]:3350          [::]:*                                      
+
+# Done: logs/2025-10-09/env_diag_2025-10-09_10-26-19.txt

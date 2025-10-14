@@ -33,9 +33,9 @@ class BaseSim2RealEnv(abc.ABC):
     def render(self, mode: str = "human") -> Any:
         ...
 
-    def apply_domain_randomization(self):
+    def apply_domain_randomization(self, *, force: bool = False):
         if self._domain_randomizer:
-            self._domain_randomizer.apply(self)
+            self._domain_randomizer.apply(self, force=force)
 
     def seed(self, seed: int):
         np.random.seed(seed)
@@ -47,6 +47,7 @@ class DummyRoArmM3Env(BaseSim2RealEnv):
 
     ACTION_DIM = 3
     OBS_DIM = 6
+    ACTION_RANGE = (-0.1, 0.1)
 
     def __init__(self, domain_randomizer=None):
         # domain_randomizer가 경로(str)이면 YAML 로드 시도
@@ -63,7 +64,7 @@ class DummyRoArmM3Env(BaseSim2RealEnv):
         if seed is not None:
             self.seed(seed)
         self._q = np.random.uniform(low=-1.0, high=1.0, size=self.ACTION_DIM)
-        self.apply_domain_randomization()
+        self.apply_domain_randomization(force=True)
         obs = self._get_obs()
         info = {"goal": self._goal.copy()}
         self._step_count = 0

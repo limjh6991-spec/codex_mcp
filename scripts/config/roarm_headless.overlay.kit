@@ -1,0 +1,59 @@
+[package]
+description = "RoArm M3 headless Isaac Sim overlay"
+version = "0.2.0"
+
+extends = [
+    "${app}/../apps/isaacsim.exp.base.python.kit"
+]
+
+requires = [
+    "omni.usd",
+    "omni.usdphysics",
+    "omni.physx",
+    "omni.isaac.core",
+    "omni.isaac.gym",
+    "omni.isaac.lab",
+    "omni.kit.loop-isaac",
+    "omni.timeline"
+]
+
+[settings]
+app.fastShutdown = true
+app.runInHeadlessMode = true
+
+[settings.app]
+window.visible = false
+renderer.enableRenderer = true
+
+[settings.rtx]
+core.asyncCompiler.enabled = false
+
+[settings.exts]
+"omni.usd".enabled = true
+"omni.kit.usd".enabled = true
+"omni.physx.bundle".enabled = true
+"omni.physx.graph".enabled = true
+"omni.graph.core".enabled = true
+
+# Hard disable GUI / manipulator / menu / viewport surfaces.
+"omni.kit.hotkeys.core".enabled = false
+"omni.kit.window.*".enabled = false
+"omni.kit.viewport.*".enabled = false
+"omni.kit.menu.*".enabled = false
+"omni.kit.widget.*".enabled = false
+"omni.kit.browser.*".enabled = false
+"omni.kit.ui*".enabled = false
+"omni.kit.manipulator.*".enabled = false
+"isaacsim.gui.*".enabled = false
+"isaacsim.app.about".enabled = false
+"isaacsim.asset.browser".enabled = false
+"omni.replicator.*".enabled = false
+"isaacsim.replicator.*".enabled = false
+"omni.syntheticdata".enabled = false
+"omni.syntheticdata.asynchronous".enabled = false
+"omni.syntheticdata.ui".enabled = false
+"omni.services.replicator".enabled = false
+"omni.services.replicator.commands".enabled = false
+"omni.services.replicator.scripts".enabled = false
+"omni.graph.replicator".enabled = false
+

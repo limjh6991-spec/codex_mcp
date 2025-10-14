@@ -1,0 +1,50 @@
+당신은 시니어 {언어/프레임워크} 엔지니어입니다.
+아래 컨텍스트로부터 문제 원인 분석과 수정 방안을 제시하세요.
+- 목표/제약을 우선 준수
+- 변경사항이 목표와 정합한지 검증
+- 실패 테스트를 통과시키기 위한 최소 수정안 → 패치(코드블록)로 제시
+- 리스크/부작용/성능 영향 정리
+- 후속 체크리스트(테스트, 타입, 보안) 5개 이내
+
+<CONTEXT_BUNDLE>
+(여기에 context_bundle.md 전문 붙여넣기)
+</CONTEXT_BUNDLE>
+
+
+context_bundle.md 생성후
+copilot이 생성한 Goal / Constraints 채워넣기
+자비스
+docs폴더 파일들과 daily폴더의 로그 파일을 읽고 
+최종 목표와 오늘의 목표를 아래 구조로 생성해줘
+
+- Goal:
+      -
+- Constraints:
+      -
+
+
+## Goal / Constraints
+
+- Goal:
+      - VS Code + GitHub Copilot(MCP) 워크플로에서 Isaac Sim ↔ 강화학습 ↔ 실기 로봇 파이프라인을 하나로 묶고, Sim2Real 전환까지 이어지는 ContextBridge 오케스트레이션 구축 
+      - 오늘은 verify_usd_roarm_m3.py CLI 복구, Isaac 런처의 확장 토글 플래그 검증, isaac_roarm_env와 PPO 루프 연동, 실기 파라미터 범위 초안 작성에 집중
+- Constraints:
+      - Isaac 관련 작업은 반드시 ~/isaacsim-venv 활성화 후 activate_isaacsim_env.sh로 환경 변수를 세팅할 것 
+      - Isaac 확장 비활성화는 TOML만으로는 부족하므로 --disable/--enableOnly 플래그 실험을 병행해야 함 
+      - verify_usd_roarm_m3.py가 현재 CLI 파싱 실패 상태이므로 수정 전까지는 pxr.Usd 임시 확인 절차를 유지 
+      - 실기 하드웨어 캘리브레이션(마찰·질량·지연) 데이터가 아직 확보되지 않아 도메인 랜덤라이제이션 범위는 가이드라인 수준에서만 작성 가능
+
+
+예)
+당신은 시니어 로봇팔 Sim2Real 강화학습 전문 엔지니어입니다.
+아래 컨텍스트로부터 문제 원인 분석과 수정 방안을 제시하세요.
+- 목표/제약을 우선 준수
+- 변경사항이 목표와 정합한지 검증
+- 실패 테스트를 통과시키기 위한 최소 수정안 → 패치(코드블록)로 제시
+- 리스크/부작용/성능 영향 정리
+- 후속 체크리스트(테스트, 타입, 보안) 5개 이내
+
+<CONTEXT_BUNDLE>
+업로드 파일 : context_bundle.md
+</CONTEXT_BUNDLE>
+

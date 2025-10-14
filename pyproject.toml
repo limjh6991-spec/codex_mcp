@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Codex + MCP 통합 VSCode 환경 기반 로봇팔 (roarm m3) Isaac Sim 강화학습"
 authors = [ { name = "roarm" } ]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 license = {text = "MIT"}
 
 # 코어 최소 의존성 (MCP + 기본 유틸 위주, RL/학습 프레임워크 제외)
@@ -23,6 +23,7 @@ dependencies = [
   "websockets>=12.0,<13.0",
   "msgpack>=1.0.0,<2.0.0",
   "orjson>=3.9.0,<4.0.0",
+  "fastmcp>=0.3.5,<0.5.0",
 ]
 
 [project.optional-dependencies]

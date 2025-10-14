@@ -7,22 +7,39 @@ Stable-Baselines3 PPO 학습 루프가 Isaac Sim 환경과 결합된 상태에�
 1. 학습 스크립트 개선
    - `training/train_ppo.py`에 `--device {auto,cpu,cuda}` 플래그 및 `TrainConfig.device` 필드 추가.
    - PPO 인스턴스 생성 시 지정 디바이스를 사용하도록 반영.
+   - `--policy-output` / `--load-policy` 플래그 추가로 장기 학습 후 정책 저장 및 재개 시나리오 지원.
 2. 실행 검증
    - Isaac 전용 Python 환경에서 `~/python.sh training/train_ppo.py --total_timesteps 2 --env-kind isaac --seed 42 --device cpu` 실행.
    - FPS ≈1259, 정책 파일 `policies/ppo_roarm.zip` 생성, CUDA 관련 치명 오류 미발생.
 3. 문서 업데이트
    - README에 2025-10-12 업데이트 섹션 추가 및 `--device` 옵션 설명 보강.
    - `docs/STATUS.md`, `docs/오늘_작업_요약.md`, `docs/daily/2025-10-12.md` 갱신.
+4. CUDA 12.8 대응 PyTorch 나이틀리 설치 및 GPU 스모크 테스트 재실행
+   - `torch-2.10.0.dev20251011+cu128`/`torchvision-0.25.0.dev20251011+cu128`/`torchaudio-2.8.0.dev20251011+cu128` 설치.
+   - `~/python.sh training/train_ppo.py --total_timesteps 2 --env-kind isaac --seed 42 --device cuda` 실행 시 `Using cuda device` 로그 확인, FPS≈945로 완료.
+5. 장기 학습 소크(soak) & 재시작 검증
+   - `~/python.sh training/train_ppo.py --total_timesteps 16384 --env-kind isaac --seed 42 --device cuda --policy-output policies/ppo_roarm_soak` 실행, FPS 1450±에 수렴하며 정책 파일 저장 확인.
+   - 기존 체크포인트를 로드한 `~/python.sh training/train_ppo.py --total_timesteps 2048 --env-kind isaac --seed 43 --device cuda --load-policy policies/ppo_roarm_soak.zip --policy-output policies/ppo_roarm_resume` 실행으로 재개(run-resume) 시나리오 검증.
+6. USD 검증 스크립트 보강
+   - `scripts/verify_usd_roarm_m3.py`에 조인트 부착 검사(`validate_joint_attachments`)와 CLI 플래그(`--skip-joint-checks`)를 추가하고 `summarize_stage` 결과를 구조화.
+   - `~/python.sh scripts/verify_usd_roarm_m3.py assets/roarm_m3/usd/roarm_m3.generated.usd --hierarchy --max-depth 2 --max-prims 20` 실행으로 아티큘레이션/조인트 요약 및 계층 덤프를 복구.
+7. RoArm M3 고정 베이스 전환 및 검증
+   - Isaac Sim Stage에서 `/World/roarm_m3` 프림에 ArticulationRootAPI를 적용하고 `physics:fixedBase = True` 속성을 수동으로 추가.
+   - 물리 구성 레이어(`assets/roarm_m3/urdf/.../roarm_m3.generated_physics.usd`)에서 `/roarm_m3/root_joint` 프림을 삭제하여 월드-베이스 링크 연결을 정리.
+   - `~/python.sh scripts/verify_usd_roarm_m3.py assets/roarm_m3/usd/roarm_m3.generated.usd` 재실행 결과 조인트 6개 검증 및 `Joint attachments: OK` 확인.
 
 == 현재 과제/리스크 ==
-- PyTorch 2.3.0 공식 wheel이 RTX 5090(sm_120) 아키텍처를 지원하지 않아 GPU 학습 불가.
-- Isaac Sim은 여전히 CUDA 디바이스 초기화를 시도하므로 향후 PyTorch CUDA 빌드 정합이 필수.
+- CUDA 12.8 대응 PyTorch 나이틀리(2.10.0.dev+cu128)는 soak 테스트에서 안정적이었으나, 장기 운용 시 API/ABI 변화 가능성에 대비한 모니터링이 필요.
+- 향후 정식 sm_120 지원 릴리스가 나오면 버전 고정 및 재설치 플랜을 즉시 실행할 수 있도록 절차 정비가 요구됨.
+- Isaac Sim 확장 추가 설치 시 Nightly 의존성과 충돌할 여지가 있으므로, 신규 패키지 도입 전 wheel 호환성 검증 절차를 마련해야 함.
+- RoArm M3를 고정 베이스로 전환한 이후 동적 테스트(리치/픽)의 회귀 범위를 재검토해야 함.
 
 == 다음 액션 제안 ==
-1. NVIDIA 제공 PyTorch nightly 혹은 wheel에서 sm_120 지원 여부 확인 및 테스트.
-2. GPU 모드 재활성화 후 학습 속도/안정성 벤치마크 수행.
-3. `verify_usd_roarm_m3.py` CLI 복구 및 Isaac 관절 attach 경로 강화.
-4. Domain randomization 파라미터에 실측 데이터를 반영하는 캘리브레이션 계획 수립.
+1. CUDA 나이틀리 의존성 상태를 모니터링하면서 정식 sm_120 지원 wheel 릴리스 시 버전 고정/롤백 절차를 문서화.
+2. `verify_usd_roarm_m3.py` 실행 경로를 VS Code 태스크/CI 스모크 테스트에 통합하여 정기 검증 자동화.
+3. Isaac PPO 파이프라인에 대한 추가 soak/회귀 자동화(장시간 벤치마크, 로그 수집) 스크립트를 마련.
+4. Domain randomization 파라미터에 실측 데이터를 반영하기 위한 캘리브레이션 세션 일정을 확정.
+5. RoArm M3 고정 베이스 자산에 대한 회귀 체크리스트(계층 변화, 관절 속성, 시뮬레이션 안정성)를 문서화하고 공유.
 
 == 작성 시각 ==
-2025-10-12T15:35:00Z (UTC 기준)
+2025-10-12T16:12:00Z (UTC 기준)

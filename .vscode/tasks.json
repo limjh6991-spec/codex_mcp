@@ -92,6 +92,67 @@
             "type": "shell",
             "command": "python mcp_servers/isaac_controller_server.py",
             "problemMatcher": []
+        },
+        {
+            "label": "Context: Build Bundle",
+            "type": "shell",
+            "command": "python ${workspaceFolder}/context_bridge/context_bridge_mcp.py",
+            "problemMatcher": []
+        },
+        {
+            "label": "RoArm: Headless quick test (no-quiet, overlay off)",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-lc",
+                "CARB_APP_QUIET_SHUTDOWN=0 ROARM_DISABLE_HEADLESS_OVERLAY=1 python open_roarm_m3_gui.py assets/roarm_m3/roarm_m3.usd --mode train --warmup-steps 10 --max-steps 120 --no-quiet-shutdown --no-blocklist"
+            ],
+            "problemMatcher": [],
+            "options": {
+                "env": {
+                    "PYTHONUNBUFFERED": "1"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "close": false
+            }
+        },
+        {
+            "label": "RoArm: Headless EGL only (GLX vendor unset)",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-lc",
+                "__GLX_VENDOR_LIBRARY_NAME= CARB_APP_QUIET_SHUTDOWN=0 ROARM_DISABLE_HEADLESS_OVERLAY=1 python open_roarm_m3_gui.py assets/roarm_m3/roarm_m3.usd --mode train --max-steps 120 --no-quiet-shutdown --no-blocklist"
+            ],
+            "problemMatcher": [],
+            "options": {
+                "env": {
+                    "PYTHONUNBUFFERED": "1"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "close": false
+            }
+        },
+        {
+            "label": "RoArm: GUI review (baseline)",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-lc",
+                "CARB_APP_QUIET_SHUTDOWN=0 python open_roarm_m3_gui.py assets/roarm_m3/roarm_m3.usd --mode review --max-steps 600 --no-quiet-shutdown"
+            ],
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "close": false
+            }
         }
     ],
     "inputs": [

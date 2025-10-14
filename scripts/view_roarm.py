@@ -10,6 +10,18 @@ Usage (bundled Python recommended):
 from __future__ import annotations
 import argparse, time
 
+
+def _resolve_world_api():
+    """Return (WorldCls, open_stage_fn) using the newest Isaac Sim API when possible."""
+    try:
+        from isaacsim.core.api import World as _World  # type: ignore
+        from isaacsim.core.utils.stage import open_stage as _open_stage  # type: ignore[attr-defined]
+        return _World, _open_stage
+    except Exception:
+        from omni.isaac.core import World as _World  # type: ignore
+        from omni.isaac.core.utils.stage import open_stage as _open_stage  # type: ignore
+        return _World, _open_stage
+
 # Try new API first
 _sim_app = None
 try:
@@ -47,8 +59,7 @@ def main():
     ensure_app(headless=args.headless)
 
     # world / open existing USD as stage
-    from omni.isaac.core import World  # type: ignore
-    from omni.isaac.core.utils.stage import open_stage  # type: ignore
+    World, open_stage = _resolve_world_api()
     from omni.usd import get_context  # type: ignore
     open_stage(args.usd)
     stage = get_context().get_stage()

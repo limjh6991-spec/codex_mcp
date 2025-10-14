@@ -8,12 +8,24 @@ from typing import List, Dict, Any, Optional, Sequence
 import logging
 import time
 import json
+import importlib.util
 
-try:  # pragma: no cover
-    import omni.isaac.kit  # type: ignore
-    ISAAC_AVAILABLE = True
-except Exception:  # noqa
-    ISAAC_AVAILABLE = False
+
+def _module_exists(name: str) -> bool:
+    try:
+        return importlib.util.find_spec(name) is not None
+    except Exception:
+        return False
+
+
+ISAAC_AVAILABLE = any(
+    _module_exists(candidate)
+    for candidate in (
+        "isaacsim",
+        "isaacsim.simulation_app",
+        "omni.isaac.kit",
+    )
+)
 
 class JointAPI:
     def __init__(self, articulation=None):  # articulation 핸들은 실제 Isaac 로딩 후 주입 예정
@@ -21,6 +33,11 @@ class JointAPI:
         self._prim_path: str | None = None
         self._last_positions: List[float] = []
         self._last_velocities: List[float] = []
+        self._fallback_attached = False
+        self._fallback_state: Dict[str, List[float]] = {
+            "positions": [],
+            "velocities": [],
+        }
         self._log = logging.getLogger(__name__)
 
     def attach(self, prim_path: str, articulation=None, world=None, tries: int = 1, retry_interval: float = 0.5):
@@ -39,7 +56,11 @@ class JointAPI:
         -------
         dict : {attached: bool, prim_path: str, has_handle: bool, created: bool}
         """
-        self._prim_path = prim_path
+        # Reset attachment bookkeeping
+        self._prim_path = None
+        self._fallback_attached = False
+        if articulation is None:
+            self._articulation = None
         created = False
         error_code: str | None = None
         attempt = 0
@@ -62,6 +83,7 @@ class JointAPI:
         if articulation is not None:
             self._articulation = articulation
             created = True
+            self._prim_path = prim_path
         elif ISAAC_AVAILABLE and world is not None:
             if tries < 1:
                 tries = 1
@@ -186,6 +208,7 @@ class JointAPI:
                         error_code = None if self._articulation is not None else (error_code or ("ATTACH_NO_BACKEND:" + ";".join(import_error_msgs[-2:])))
                         # If attached, break; else retry
                         if self._articulation is not None:
+                            self._prim_path = prim_path
                             break
                 except Exception as e:  # noqa
                     error_code = "ATTACH_FAIL"
@@ -199,6 +222,22 @@ class JointAPI:
                     time.sleep(retry_interval)
         else:
             error_code = "ISAAC_UNAVAILABLE"
+
+        # Provide deterministic fallback when Isaac handle unavailable
+        if self._articulation is None:
+            self._prim_path = prim_path
+            self._fallback_attached = True
+            # Preserve last known state; ensure dict copies for isolation
+            self._fallback_state = {
+                "positions": list(self._last_positions),
+                "velocities": list(self._last_velocities),
+            }
+            self._last_positions = list(self._fallback_state["positions"])
+            self._last_velocities = list(self._fallback_state["velocities"])
+            if error_code is None:
+                error_code = "FALLBACK_ATTACH"
+        else:
+            self._fallback_attached = False
 
         # Diagnostics: count dofs if possible
         dof_count = None
@@ -228,8 +267,12 @@ class JointAPI:
         except Exception:
             pass
 
+        attached = self._articulation is not None or self._fallback_attached
+        if not attached:
+            # No attachment succeeded; clear prim path for future retries
+            self._prim_path = None
         result = {
-            "attached": self._articulation is not None,
+            "attached": attached,
             "prim_path": prim_path,
             "has_handle": self._articulation is not None,
             "created": created,
@@ -241,7 +284,7 @@ class JointAPI:
         return result
 
     def is_attached(self) -> bool:
-        return self._prim_path is not None
+        return (self._prim_path is not None) and (self._fallback_attached or self._articulation is not None)
 
     def list_joints(self, only_movable: bool = True) -> List[str]:
         """Return list of joint names.
@@ -454,6 +497,12 @@ class JointAPI:
 
         Fallback: Isaac API 미사용 혹은 articulation 없음 → 빈 리스트.
         """
+        if self._fallback_attached and (not ISAAC_AVAILABLE or self._articulation is None):
+            positions = list(self._fallback_state.get("positions", []))
+            velocities = list(self._fallback_state.get("velocities", []))
+            self._last_positions = positions
+            self._last_velocities = velocities
+            return {"positions": positions, "velocities": velocities}
         if not ISAAC_AVAILABLE or self._articulation is None:  # graceful fallback
             return {"positions": self._last_positions, "velocities": self._last_velocities}
         # 실제 Isaac articulation view 사용 시도
@@ -521,6 +570,22 @@ class JointAPI:
           * articulation.set_joint_position_targets(target)
         """
         if not ISAAC_AVAILABLE or self._articulation is None:
+            if self._fallback_attached:
+                prev = list(self._fallback_state.get("positions", []))
+                if not prev:
+                    prev = [0.0 for _ in deltas]
+                if len(prev) < len(deltas):
+                    prev.extend([0.0] * (len(deltas) - len(prev)))
+                updated = [float(p) + float(d) for p, d in zip(prev, deltas)]
+                self._fallback_state["positions"] = updated
+                self._fallback_state["velocities"] = [0.0 for _ in updated]
+                self._last_positions = list(updated)
+                self._last_velocities = list(self._fallback_state["velocities"])
+                return {
+                    "applied": False,
+                    "reason": "Fallback articulation",
+                    "positions": list(updated),
+                }
             return {"applied": False, "reason": "No articulation or Isaac unavailable"}
         try:  # pragma: no cover - Isaac 환경 필요
             import numpy as np  # local import to avoid cost when Isaac 미가용

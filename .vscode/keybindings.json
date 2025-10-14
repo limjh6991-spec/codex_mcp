@@ -1,0 +1,8 @@
+[
+    {
+        "key": "ctrl+alt+b",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Context: Build Bundle",
+        "when": "editorTextFocus"
+    }
+]

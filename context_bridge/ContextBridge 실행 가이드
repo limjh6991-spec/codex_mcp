@@ -1,0 +1,155 @@
+ContextBridge 실행 가이드 (간단 버전)
+0. 사전 준비
+
+VS Code로 codex_mcp/ 폴더 열기
+Python 3.12 가상환경 준비(RL/분석), Isaac용 3.11 가상환경은 별도
+필요한 키를 .env에 설정 (둘 다 없어도 동작은 가능하지만, 모델 호출 시 필요)
+
+cp .env.example .env
+# .env 파일 열어 다음 값 넣기
+# OPENAI_API_KEY=...
+# ANTHROPIC_API_KEY=...
+
+터미널 세션에서 적용:
+export $(grep -v '^#' .env | xargs)
+
+
+1. 의존성 설치 (프로젝트 루트에서)
+python -m venv .venv
+source .venv/bin/activate
+pip install -U pip
+pip install -e .
+
+2. VS Code에서 “번들 빌드” 실행
+VS Code 명령 팔레트(⌘/Ctrl+Shift+P) → Tasks: Run Task
+→ Context: Build Bundle 선택
+→ 내부적으로 python ${workspaceFolder}/context_bridge_mcp.py 실행
+  python /home/roarm_m3/codex_mcp/context_bridge/context_bridge_mcp.py
+
+바로 CLI로도 가능:
+source .venv/bin/activate
+python ./context_bridge/context_bridge_mcp.py
+
+
+3. 실행 확인 (빠른 체크)
+작업/명령 실행 후 터미널 출력에 에러 없이 종료했는지 확인
+.vscode/settings.json에 등록된 ContextBridgeMcp 런처가 보이면 OK
+(VS Code “Run and Debug” 뷰에서도 확인 가능)
+
+4. MCP 연결(옵션: MCP Inspector로 점검)
+VS Code 확장: MCP Inspector 설치
+Inspector 열고 Transport: STDIO
+Server Script Path: 프로젝트 루트의 context_bridge_mcp.py
+Connect → Tools/schema 표시되면 정상
+
+5. (선택) Isaac/ROS 관련 작업 전 점검
+Isaac 전용 venv 활성화 + 경로 설정:
+source ~/isaacsim-venv/bin/activate
+source scripts/activate_isaacsim_env.sh
+python scripts/check_isaac_import.py
+
+확장 토글 필요 시:
+python scripts/manage_isaacsim_extensions.py disable omni.isaac.asset_browser omni.isaac.franka
+python scripts/manage_isaacsim_extensions.py remove omni.isaac.franka
+
+6. 매일 시작 루틴 (추천)
+터미널에서 .env 적용
+.venv 활성화
+Context: Build Bundle 실행
+docs/STATUS.md 확인 → 오늘 ToDo 반영
+필요 시 Isaac venv/확장 상태 확인
+
+7. 자주 만나는 이슈 & 빠른 해결
+키 미설정 오류: .env에 키 넣고 export $(grep -v '^#' .env | xargs) 다시 실행
+모듈/버전 충돌: RL(3.12)과 Isaac(3.11) 가상환경 분리가 원칙
+pxr 임포트 실패: Isaac venv 활성화 후 scripts/activate_isaacsim_env.sh 꼭 호출
+MCP Inspector 연결 실패: Path가 context_bridge_mcp.py 맞는지, 현재 쉘에서 .venv 활성화됐는지 확인
+
+
+=========================================================================
+이제 ContextBridgeMcp — Copilot ↔ 외부 AI 하이브리드 루프를 완성했으니,
+이걸 실제로 어떻게 쓰면 되는지 단계별로 정리해드릴게요.
+아래는 “개발 루틴에서 실제로 돌리는 방식”입니다.
+
+🚀 1단계: 코딩은 평소처럼 Copilot으로
+평소처럼 VS Code에서 GitHub Copilot을 사용하세요.
+코드 수정, 함수 추가, 리팩터링, 오류 해결 등 일상 코딩 작업 그대로 진행.
+Copilot이 작업 후 “다음 작업을 선택하세요” 같은 메시지를 보여줄 때,
+그 시점이 ContextBridge 루프를 돌릴 타이밍입니다.
+
+🧩 2단계: 번들(context_bundle.md) 생성
+단축키 Ctrl + Alt + B (또는 python context_bridge_mcp.py) 실행
+자동으로 생성되는 파일 → context_bundle.md
+
+이 파일 안에는 다음 정보가 들어 있습니다:
+## Repo Map            ← 현재 레포 구조
+## Goal / Constraints  ← 작업 목표·제약
+## Changes (git diff)  ← 수정된 코드 부분
+## Test / Run Logs     ← 테스트/실행 결과 tail
+👉 즉, “현재 개발 맥락을 외부 AI에게 그대로 설명할 수 있는 패키지”예요.
+
+🧠 3단계: 외부 AI에게 넘기기
+생성된 context_bundle.md 내용을 복사해서
+제가 드린 [표준 프롬프트 템플릿]을 ChatGPT Plus 또는 Claude Pro에 붙여넣습니다:
+
+[역할]
+당신은 시니어 엔지니어입니다.
+아래 컨텍스트를 분석해 다음 작업을 제안하고 개선 패치를 제시하세요.
+
+<CONTEXT_BUNDLE>
+(여기에 context_bundle.md 전문 붙여넣기)
+</CONTEXT_BUNDLE>
+
+⚙️ 4단계: Copilot으로 되돌리기
+1. 외부 AI가 제시한 수정/패치안을 복사합니다.
+2. VS Code의 Copilot Chat 창에 붙여넣어요:
+   위 AI가 제시한 2번 개선 방향을 반영해줘.
+3. Copilot이 실제 코드로 반영해줍니다.
+4. 테스트/빌드 후, 다시 Ctrl + Alt + B로 새 context_bundle 생성 → 루프 반복.
+
+🔁 5단계: 자동 툴 호출 활용 (선택)
+MCP Inspector나 VS Code 명령 팔레트에서 직접 툴을 호출할 수도 있습니다.
+
+| 툴명                     | 목적                             | 예시 호출                                                                       |
+| ---------------------- | ------------------------------ | --------------------------------------------------------------------------- |
+| `build_context`        | 번들 수동 생성                       | `ContextBridgeMcp.build_context(goal="로깅 개선", constraints="Node20")`        |
+| `suggest_next_actions` | Copilot 결과 기반 “다음 작업 후보” 자동 작성 | `ContextBridgeMcp.suggest_next_actions(diff_excerpt="...", failures="...")` |
+| `make_prompt`          | 외부 AI 붙여넣기용 완성 프롬프트 생성         | `ContextBridgeMcp.make_prompt()`                                            |
+| `send_to_ai`           | (선택) ChatGPT API로 직접 전송        | `ContextBridgeMcp.send_to_ai(provider="openai", user_prompt="...")`         |
+
+💡 6단계: 실제 루프 예시
+1. Copilot이 context_bridge_mcp.py 개선 제안 → 수정
+2. Ctrl + Alt + B → 새 번들 생성
+3. ChatGPT Plus에 붙여넣기 → “다음 작업 3개 제안 및 우선순위” 요청
+4. ChatGPT가 “테스트 자동화 강화”를 추천
+5. Copilot에게 “위 1번 제안 반영해줘” 입력
+6.결과 테스트 → 다시 번들 생성 → ChatGPT로 검증
+
+이 과정을 1~2분 단위로 반복하면,
+Copilot = 실행 엔진, ChatGPT = 판단 두뇌 구조가 됩니다.
+
+🧱 7단계: 파일 구조 요약
+codex_mcp/
+ ├─ context_bridge_mcp.py      ← MCP 서버 스크립트
+ ├─ pyproject.toml
+ ├─ .venv/
+ ├─ .vscode/
+ │   ├─ settings.json          ← MCP 서버 등록
+ │   ├─ tasks.json             ← “Context: Build Bundle” 등록
+ │   └─ keybindings.json       ← Ctrl+Alt+B 단축키
+ └─ context_bundle.md          ← 매 실행 시 새로 생성
+
+
+🛡️ 8단계: 보안·관리 팁
+1. 외부 AI로 넘길 때 비밀번호/API키/내부URL이 포함되지 않도록 확인
+2. 필요 시 context_bridge_mcp.py 안 diff_paths 인자 사용으로 범위 제한
+3. 내부망에서만 돌릴 경우 send_to_ai() 대신 사내 LLM 프록시를 연결 가능
+
+✅ 정리
+| 단계      | 수행자                  | 설명             |
+| ------- | -------------------- | -------------- |
+| ① 코딩    | Copilot              | IDE 내 자동 완성/수정 |
+| ② 번들 생성 | ContextBridgeMcp     | `Ctrl+Alt+B`   |
+| ③ 판단/리뷰 | ChatGPT Plus 등 외부 AI | 번들 붙여넣기        |
+| ④ 실행 반영 | Copilot              | 제안된 수정 반영      |
+| ⑤ 반복    | 두 도구                 | 루프 완성          |

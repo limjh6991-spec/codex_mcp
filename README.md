@@ -6,14 +6,25 @@
 - 일일 로그(`docs/daily/`)와 상태 보드(`docs/STATUS.md`)를 통해 작업 흐름과 잔여 이슈를 추적합니다.
 - Isaac 확장 토글을 자동화하는 `scripts/manage_isaacsim_extensions.py`와 각종 환경 점검 스크립트를 제공합니다.
 
+### 2025-10-14 업데이트
+- `configs/domain_randomization.yaml`의 관절 목표 범위를 중간값 중심으로 재조정하여 비현실적인 목표가 샘플되는 문제를 완화했습니다.
+- `src/envs/isaac_roarm_env.py`에 USD ↔ 조인트 설정 간 별칭 맵을 구축하고 랜덤 목표 재매핑을 통합해 학습·재생 루프가 동일한 순서를 따르도록 정리했습니다.
+- 새 설정으로 `training/train_ppo.py --device cpu` 재학습을 수행하여 `policies/ppo_roarm_retrained.zip`을 생성했습니다.
+- `scripts/play_roarm_policy.py` GUI 재생을 실행해 500스텝 수집까지는 동작을 확인했으나, 원격 세션에서는 화면 출력이 비어 있는 현상이 반복되어 추가 조사 항목으로 남겨두었습니다.
+
 ### 2025-10-13 업데이트
-- 다중 GPU 환경에서 Isaac Sim이 AMD iGPU 경로로 초기화되던 문제를 해결하기 위해 `scripts/activate_isaacsim_env.sh`에 NVIDIA 전용 Vulkan/GLX/EGL 기본값을 추가했습니다. 이제 Isaac 세션을 시작하면 자동으로 RTX 5090 ICD만 로드되어 llvmpipe/RADV 경로가 차단됩니다.
-- 갱신된 환경에서 `python scripts/open_roarm_m3_gui.py --mode train` 헤드리스 런을 재검증한 결과, 13만 스텝 이상 연속 실행 동안 pre-startup crash가 더 이상 재현되지 않았습니다. 헤드리스 모드에서 GUI/Replicator 확장 비활성화 정책(`scripts/config/roarm_headless.overlay.kit`)도 그대로 유지됩니다.
-- NVIDIA-only 설정은 `VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json`, `MESA_LOADER_DRIVER_OVERRIDE=nvidia`, `__VK_LAYER_NV_optimus=NVIDIA_only` 등을 포함하므로, 다른 사용 환경에서도 동일한 결과를 재현하려면 `scripts/activate_isaacsim_env.sh`를 통해 세션을 시작하세요.
-- RTX 5090 (SM 12.0) 지원 PyTorch 빌드가 공개되기 전까지 학습은 `training/train_ppo.py --device cpu` 옵션으로 CPU 경로를 기본값으로 운영합니다. `pip install "tqdm>=4.64" rich`를 통해 Stable-Baselines3 진행률 콜백 의존성을 충족했고, 2,000 스텝 PPO 학습이 성공적으로 완료되어 정책(`policies/ppo_roarm_headless.zip`)이 생성되었습니다. 향후 RTX 50 시리즈 대응 휠 공개 여부는 PyTorch/Isaac Sim 릴리스 노트를 주기적으로 모니터링합니다.
+- `roarm_app/runtime/run_loop.py`에 USD 스테이지 종료 전 이벤트 스트림 해제, `detach_stage` 호출, PhysX 전용 정리 유틸 순차 실행, asyncio 태스크 취소 등 안전한 종료 루틴을 추가했습니다. 헤드리스 세션에서 복수의 경고가 이어지던 경우에도 Kit/SimulationApp이 중복 종료되지 않도록 `_KIT_SHUTDOWN_DONE` 가드를 둡니다.
+- `roarm_app/cli.py`가 생성하는 headless 블록리스트에 오디오 계열 확장을 포함시키고, `CARB_AUDIO_DISABLED=1`/`CARB_ENABLE_AUDIO=0` 환경변수 설정, `--/exts/<name>/enabled=false` 플래그 삽입으로 Kit 플러그인 단계에서 즉시 비활성화하도록 보강했습니다.
+- Isaac RL 환경(`src/envs/isaac_roarm_env.py`)이 직접 `collect_extension_blocklist`와 `expand_prefix_blocklist`를 호출하여 SimulationApp 인스턴스화 직후 다시 한 번 확장 매니저와 동기화합니다. CLI 이외 경로로 학습 스크립트를 구동하더라도 GUI/Replicator/오디오 확장이 재활성화되지 않습니다.
+- 최신 GPU PPO 검증(`training/train_ppo.py --env-kind isaac --device cuda --total_timesteps 512`)은 성공적으로 정책을 저장했지만, Replicator 카테고리 제거 실패/`USD stage detach not called`/오디오 컨텍스트 누수 경고가 여전히 발생합니다. 해당 이슈는 다음 릴리스에서 추가 정비가 필요합니다.
+
+#### 2025-10-13 GPU PPO 로그 요약
+- 실행 명령: `~/isaacsim-venv/bin/python training/train_ppo.py --env-kind isaac --device cuda --total_timesteps 512 --seed 42`
+- 정책 산출물: `policies/ppo_roarm_gpu_validation.zip`
+- 잔여 경고: Replicator 카테고리 제거 실패, USD Stage detach 미호출, PhysX 히스토리 잔존, `carb.audio.context` 누수, 플러그인 재귀 언로드. 세부 로그는 `logs/2025-10-13-gpu-ppo-summary.md` 참고.
 
 ### 2025-10-12 업데이트
-- `training/train_ppo.py`에 `--device {auto,cpu,cuda}` 옵션을 추가하여 Stable-Baselines3가 사용할 연산 디바이스를 제어할 수 있게 했습니다. Isaac Sim은 여전히 GPU 메모리를 초기화하지만, PyTorch가 RTX 5090(sm_120) 대응 빌드가 없는 동안엔 `--device cpu`로 임시 우회가 가능합니다.
+- `training/train_ppo.py`에 `--device {auto,cpu,cuda}` 옵션을 추가하여 Stable-Baselines3가 사용할 연산 디바이스를 제어할 수 있게 했습니다. Isaac Sim은 GPU 메모리를 초기화하므로 PyTorch `cu128` 빌드 설치 후 `--device cuda`로 전환하면 즉시 GPU 학습을 복원할 수 있고, 구버전 PyTorch가 남아 있을 경우엔 `--device cpu`로 안전하게 동작합니다.
 - Isaac Sim 전용 Python 환경(3.11)에서 PPO 스모크 테스트(`--env-kind isaac`, `--total_timesteps 2`)를 CPU 경로로 통과시켜 정책(`policies/ppo_roarm.zip`) 저장을 확인했습니다.
 - 장기적으로는 PyTorch와 Isaac Sim이 동일한 CUDA 드라이버/SM 조합을 사용하도록 재빌드 또는 NVIDIA 제공 binary를 확보해야 합니다. 관련 후속작업은 `docs/STATUS.md` 및 `docs/오늘_작업_요약.md`에 정리했습니다.
 
@@ -126,10 +137,10 @@ pip install isaacsim[all,extscache]==5.0.0 \
 - 벤치마크·분석 스크립트: `measure_round_trip.py`, `bench_transport.py`, `analyze_hash_drift.py` 등.
 
 ## 다음 단계 (요약)
-- `scripts/verify_usd_roarm_m3.py` CLI 파서를 복구하고 계층 출력 재도입.
-- Isaac 런처 플래그(`--disable`, `--enableOnly`)와 TOML override를 결합한 확장 고정 방식을 검증.
-- 실제 Isaac 환경을 PPO 학습 루프에 연결하고 관측/행동 스케일을 정규화.
-- 실기 파라미터(마찰, 질량, 지연) 범위를 측정하여 `configs/domain_randomization.yaml`에 반영.
+- Replicator 카테고리 제거 실패, `USD stage detach not called`, 오디오 컨텍스트 누수, recursive unload 경고를 재현 가능한 테스트와 함께 해결합니다.
+- Isaac 런처 플래그(`--disable`, `--enableOnly`)와 TOML override 조합을 재검증하고, 현재 블록리스트 로직이 모든 경로(스크립트/CLI/MCP)에서 동일하게 적용되는지 확인합니다.
+- 실제 Isaac 환경을 PPO 학습 루프에 연결한 뒤, 내일은 Isaac Sim GUI에서 학습된 정책을 로드해 간단한 재생(trajectory playback)을 검증합니다.
+- 실기 파라미터(마찰, 질량, 지연) 측정치를 확보해 `configs/domain_randomization.yaml`에 반영하고, RL 관측/행동 스케일 정규화를 마무리합니다.
 
 ## 라이선스
 MIT

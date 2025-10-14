@@ -10,7 +10,7 @@ robot:
   link_mass_scale: [0.95, 1.05]
 
 sensors:
-  camera_extrinsic_noise: 0.002  # rad
+  camera_extrinsic_noise: 0.002 # rad
   camera_intrinsic_focal_rand: [0.99, 1.01]
   depth_scale_noise: 0.01
 
@@ -24,3 +24,12 @@ curriculum:
     - { phase: 0, success_rate: 0.0, difficulty: easy }
     - { phase: 1, success_rate: 0.6, difficulty: medium }
     - { phase: 2, success_rate: 0.8, difficulty: hard }
+
+task:
+  joint_goal:
+    base_link_to_link1: [-0.35, 0.35]
+    link1_to_link2: [-0.25, 0.25]
+    link2_to_link3: [0.85, 1.15]
+    link3_to_link4: [-0.3, 0.3]
+    link4_to_link5: [-0.4, 0.4]
+    link5_to_gripper_link: [0.35, 0.85]

@@ -1,0 +1,29 @@
+[2025-10-14] 프로젝트 진행 로그
+
+== 개요 ==
+조인트 별칭 매핑과 목표 재매핑 로직을 Isaac RL 환경에 도입하고, 좁아진 도메인 랜덤라이제이션 범위로 PPO 재학습을 시행했다. 새 정책을 GUI에서 재생하며 500스텝 로그를 확보했지만 원격 세션에서는 창이 비어 보이는 문제가 남아 추가 조사가 필요하다.
+
+== 주요 완료 항목 ==
+1. 환경 코드 개선
+   - `src/envs/isaac_roarm_env.py`에 조인트 별칭/역매핑 테이블을 구축해 조인트 설정과 USD 아티큘레이션 명칭 불일치 시에도 목표 재매핑이 가능하도록 함.
+   - 랜덤 목표가 실 관절 순서와 맞지 않아 발생하던 정보 손실을 방지하고, `info["joint_names"]`로 실제 순서를 노출해 디버깅 지표를 확장.
+2. 도메인 랜덤라이제이션 조정
+   - `configs/domain_randomization.yaml`의 `task.joint_goal` 범위를 중간값 주변으로 축소해 비현실적 목표 샘플을 줄임.
+3. PPO 재학습
+   - `python training/train_ppo.py --env-kind isaac --device cpu --policy-output policies/ppo_roarm_retrained ...` 실행으로 10,240 스텝 학습 후 정책 파일을 재생성.
+   - 학습 로그에서 Warp CUDA 경고, Replicator 제거 실패, audio context 누수 등 기존 경고는 반복되었으나 치명 오류는 없음.
+4. GUI 재생 런
+   - `python scripts/play_roarm_policy.py --policy policies/ppo_roarm_retrained.zip --episodes 1 --steps 500 --slow-ms 20 --seed 47` 실행.
+   - 콘솔 기준 누적 보상 -2644.434, 500스텝까지 진행. GUI 창이 비어 있는 현상을 확인하고 환경 진단 항목으로 분류.
+
+== 현재 과제/리스크 ==
+- Isaac GUI가 원격 환경에서 출력되지 않아 정책 동작을 직접 시각화하기 어렵다. Omniverse UI 렌더링 경로 및 Vulkan/GLX/EGL 설정 재점검 필요.
+- 재생 결과에서 목표 달성 보상이 발생하지 않아 reward 구조 또는 목표 범위 추가 조정이 요구될 수 있음.
+
+== 다음 액션 제안 ==
+1. GUI 빈 화면 문제를 재현하면서 로그/환경 변수를 수집하고, 필요 시 스크린샷 자동화 또는 USD 카메라 레코딩 대안을 모색.
+2. 재생 단계에서 `info` 로그 및 joint trajectory를 기록해 음수 보상 원인을 분석.
+3. 실측 데이터 기반 도메인 랜덤라이제이션 파라미터 보강을 위한 실험 계획을 수립.
+
+== 작성 시각 ==
+2025-10-14T20:50:00Z

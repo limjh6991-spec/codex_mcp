@@ -1,25 +1,26 @@
 # RoArm M3 Asset Scaffold
 
-This directory contains placeholder assets and specifications for integrating the RoArm M3 desktop robotic arm into Isaac Sim + RL pipeline.
+This directory now tracks the verified RoArm M3 articulation assets and metadata used by the Isaac Sim + RL pipeline.
 
 ## Files
-- `urdf/roarm_m3.urdf`: Minimal URDF skeleton for Isaac import (to be calibrated).
-- `roarm_m3_placeholder.urdf`: Interim URDF (approximate 6-DOF) to enable articulation pipeline prototyping.
-- `joint_spec.json`: Structured joint limits + axis metadata (PLACEHOLDER). Update when official specs collected.
+- `urdf/roarm_m3.generated.urdf`: Waveshare-calibrated URDF with joint limits/dynamics aligned to firmware constants.
+- `usd/roarm_m3.generated.usd`: PhysX-ready articulation with matched limits/drive gains for Isaac Sim.
+- `joint_spec.json`: Canonical joint ordering + radian limits used by observation/action schemas.
+- `external_sources/`: Official vendor firmware, Python demos, STEP + 2D drawings collected on 2025-10-12.
 
 ## Integration Plan
-1. Replace URDF with accurate model or USD converted via Isaac Sim URDF importer.
-2. Generate USD via GUI Importer: see `docs/isaac/URDF_IMPORT.md` for step-by-step.
-3. Verify articulation: Use Python console to create `ArticulationView` and print joint count.
-4. Update observation/action schema with definitive `joint_names` ordering.
-5. Retrain PPO policy with correct DOF.
+1. Validate URDF ↔ USD alignment (`scripts/verify_usd_roarm_m3.py` + pxr-driven limit audit).
+2. Regenerate USD snapshots after significant kinematics changes (`usd/snapshots/`).
+3. Sync observation/action schema with `joint_spec.json` (bump schema version).
+4. Punch through Isaac control loop smoke test (GUI articulation + RL dummy policy).
+5. Retrain PPO policy with confirmed DOF + scaling.
 
 ## TODO Checklist
-- [ ] Collect official joint limit/axis data from vendor docs or SDK.
-- [ ] Replace placeholder URDF and bump `joint_spec.json.version`.
-- [ ] Add gripper/end-effector specification if applicable.
+- [x] Collect official joint limit/axis data from vendor docs or SDK.
+- [x] Replace placeholder URDF and bump `joint_spec.json.version`.
+- [ ] Add gripper/end-effector load spec & mimic mapping (optional).
 - [ ] Create validation test: asserts len(joint_names)==assumed_dof.
 - [ ] Record baseline latency with real articulation loop.
 
 ## Notes
-Do NOT deploy training results originating from the placeholder kinematics; they are for infrastructure shake-down only.
+The new URDF/USD pair supersedes the placeholder model; invalidate any historical training runs that predate `joint_spec.json` version `1`.
